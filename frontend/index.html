@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hazuru's Assistant - Dashboard</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            discord: { DEFAULT: '#5865F2', hover: '#4752C4', light: '#7289DA' },
+            dark: { 900: '#0b0d17', 800: '#11131f', 700: '#181a2a', 600: '#1e2033' },
+            card: { DEFAULT: '#1a1c2e', hover: '#222440' },
+            accent: { pink: '#eb459e', green: '#57F287', yellow: '#FEE75C', red: '#ED4245' },
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { scrollbar-width: thin; scrollbar-color: #5865F2 #11131f; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #11131f; }
+    ::-webkit-scrollbar-thumb { background: #5865F2; border-radius: 3px; }
+    .glow { box-shadow: 0 0 20px rgba(88, 101, 242, 0.3); }
+    input[type="color"] { -webkit-appearance: none; border: none; width: 36px; height: 36px; cursor: pointer; border-radius: 8px; padding: 0; }
+    input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+    input[type="color"]::-webkit-color-swatch { border: none; border-radius: 8px; }
+    .toast-enter-active { animation: toastIn 0.3s ease; }
+    .toast-leave-active { animation: toastOut 0.3s ease; }
+    @keyframes toastIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes toastOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
+    .skeleton { background: linear-gradient(90deg, #1e2033 25%, #252845 50%, #1e2033 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    .embed-preview { border-left: 4px solid; background: #2f3136; border-radius: 4px; }
+    .upload-zone { position: relative; overflow: hidden; }
+    .upload-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  </style>
+</head>
+<body class="bg-dark-900 text-gray-100 font-sans min-h-screen">
+  <div id="app">
+    <!-- Toast Notifications -->
+    <div class="fixed top-4 right-4 z-[100] space-y-2">
+      <div v-for="toast in toasts" :key="toast.id"
+        class="toast-enter-active flex items-center gap-3 px-5 py-3 rounded-xl shadow-2xl border backdrop-blur-sm min-w-[280px]"
+        :class="toast.type === 'success' ? 'bg-accent-green/10 border-accent-green/30 text-accent-green' : toast.type === 'error' ? 'bg-accent-red/10 border-accent-red/30 text-accent-red' : 'bg-discord/10 border-discord/30 text-discord'">
+        <svg v-if="toast.type === 'success'" class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+        <svg v-else-if="toast.type === 'error'" class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        <svg v-else class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        <span class="text-sm font-medium">{{ toast.message }}</span>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <aside class="fixed left-0 top-0 h-full w-64 bg-dark-800 border-r border-gray-800 flex flex-col z-50">
+      <div class="p-6 border-b border-gray-800">
+        <div class="flex items-center gap-3">
+          <img v-if="dashboardConfig.logo" :src="dashboardConfig.logo" class="w-10 h-10 rounded-xl object-cover">
+          <div v-else class="w-10 h-10 rounded-xl bg-discord flex items-center justify-center font-bold text-lg">H</div>
+          <div>
+            <h1 class="font-bold text-sm">{{ dashboardConfig.title || "Hazuru's Assistant" }}</h1>
+            <p class="text-xs text-gray-500">{{ dashboardConfig.subtitle || 'Dashboard' }}</p>
+          </div>
+        </div>
+      </div>
+      <nav class="flex-1 p-4 space-y-1">
+        <button v-for="item in navItems" :key="item.id" @click="currentPage = item.id"
+          :class="currentPage === item.id ? 'bg-discord/20 text-discord border-discord/30' : 'text-gray-400 hover:text-white hover:bg-dark-700 border-transparent'"
+          class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 border">
+          <span v-html="item.icon"></span>{{ item.label }}
+        </button>
+      </nav>
+      <div class="p-4 border-t border-gray-800">
+        <div class="flex items-center gap-3 px-4 py-2">
+          <div :class="status === 'online' ? 'bg-accent-green' : 'bg-accent-red'" class="w-2.5 h-2.5 rounded-full animate-pulse"></div>
+          <span class="text-sm text-gray-400">{{ status === 'online' ? 'En linea' : 'Desconectado' }}</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="ml-64 min-h-screen">
+      <header class="sticky top-0 z-40 bg-dark-900/80 backdrop-blur-xl border-b border-gray-800 px-8 py-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-xl font-bold">{{ currentPageTitle }}</h2>
+            <p class="text-sm text-gray-500">{{ currentPageDesc }}</p>
+          </div>
+          <div v-if="selectedGuild" class="flex items-center gap-3 bg-dark-700 px-4 py-2 rounded-xl">
+            <img :src="selectedGuild.icon || 'https://cdn.discordapp.com/embed/avatars/0.png'" class="w-8 h-8 rounded-full">
+            <span class="font-medium text-sm">{{ selectedGuild.name }}</span>
+          </div>
+        </div>
+      </header>
+
+      <div class="p-8">
+        <!-- HOME -->
+        <div v-if="currentPage === 'home'" class="space-y-8">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div v-for="stat in stats" :key="stat.label" class="bg-card rounded-2xl p-6 border border-gray-800 hover:border-discord/50 transition-all duration-300 hover:glow">
+              <p class="text-gray-500 text-sm mb-1">{{ stat.label }}</p>
+              <p class="text-3xl font-bold text-discord">{{ stat.value }}</p>
+            </div>
+          </div>
+          <div>
+            <h3 class="text-lg font-semibold mb-4">Selecciona un servidor</h3>
+            <div v-if="loadingGuilds" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div v-for="i in 3" :key="i" class="bg-card rounded-2xl p-5 border border-gray-800">
+                <div class="flex items-center gap-4">
+                  <div class="w-14 h-14 rounded-xl skeleton"></div>
+                  <div class="flex-1 space-y-2"><div class="h-4 skeleton rounded w-2/3"></div><div class="h-3 skeleton rounded w-1/3"></div></div>
+                </div>
+              </div>
+            </div>
+            <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <button v-for="guild in guilds" :key="guild.id" @click="selectGuild(guild)"
+                class="bg-card hover:bg-card-hover rounded-2xl p-5 border border-gray-800 hover:border-discord/50 transition-all duration-300 text-left group hover:glow">
+                <div class="flex items-center gap-4">
+                  <img :src="guild.icon || 'https://cdn.discordapp.com/embed/avatars/0.png'" class="w-14 h-14 rounded-xl group-hover:scale-105 transition-transform">
+                  <div>
+                    <h4 class="font-semibold group-hover:text-discord transition-colors">{{ guild.name }}</h4>
+                    <p class="text-sm text-gray-500">{{ guild.memberCount }} miembros</p>
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- WELCOME / FAREWELL / PRIVATE / BOOST / BAN / KICK -->
+        <div v-if="(['welcome','farewell','private','boost','ban','kick'].includes(currentPage)) && selectedGuild" class="max-w-5xl space-y-6">
+          <!-- Config Card -->
+          <div class="bg-card rounded-2xl p-6 border border-gray-800">
+            <div class="flex items-center justify-between mb-6">
+              <div>
+                <h3 class="font-semibold text-lg">{{ configTitle }}</h3>
+                <p class="text-sm text-gray-500">{{ configDesc }}</p>
+              </div>
+              <div class="flex items-center gap-3">
+                <span v-if="saving" class="text-xs text-gray-500 flex items-center gap-1">
+                  <svg class="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                  Guardando...
+                </span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" v-model="currentConfig.enabled" @change="saveConfig" class="sr-only peer">
+                  <div class="w-11 h-6 bg-gray-700 peer-focus:ring-2 peer-focus:ring-discord/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-discord"></div>
+                </label>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div class="space-y-4">
+                <div v-if="currentPage !== 'private'">
+                  <label class="block text-sm font-medium text-gray-400 mb-2">Canal</label>
+                  <select v-model="currentConfig.channel" @change="saveConfig"
+                    class="w-full bg-dark-700 border border-gray-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-discord focus:border-transparent outline-none transition-all">
+                    <option value="">Selecciona un canal</option>
+                    <option v-for="ch in channels" :key="ch.id" :value="ch.id">#{{ ch.name }}</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-400 mb-2">Mensaje (texto plano)</label>
+                  <textarea v-model="currentConfig.message" @change="saveConfig" rows="3"
+                    class="w-full bg-dark-700 border border-gray-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-discord focus:border-transparent outline-none transition-all resize-none"
+                    placeholder="Escribe tu mensaje..."></textarea>
+                </div>
+                <div class="bg-dark-700 rounded-xl p-3">
+                  <p class="text-xs font-medium text-gray-400 mb-2">Variables (click para copiar):</p>
+                  <div class="flex flex-wrap gap-1.5">
+                    <button v-for="v in availableVars" :key="v.value" @click="copyVar(v.value)"
+                      class="px-2 py-1 bg-dark-600 hover:bg-discord/20 hover:text-discord rounded-lg text-xs font-mono transition-colors cursor-pointer" :title="v.desc">
+                      {{ v.value }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Embed Editor -->
+              <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-3">
+                    <label class="text-sm font-medium text-gray-400">Editor de Embed</label>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" v-model="currentConfig.embedEnabled" @change="saveConfig" class="sr-only peer">
+                      <div class="w-9 h-5 bg-gray-700 peer-focus:ring-2 peer-focus:ring-discord/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent-green"></div>
+                    </label>
+                    <span class="text-xs" :class="currentConfig.embedEnabled ? 'text-accent-green' : 'text-gray-500'">
+                      {{ currentConfig.embedEnabled ? 'ON' : 'OFF' }}
+                    </span>
+                  </div>
+                  <button @click="resetEmbed" class="text-xs text-gray-500 hover:text-accent-red transition-colors">Reset</button>
+                </div>
+
+                <div v-if="!currentConfig.embedEnabled" class="bg-dark-700 rounded-xl p-4 text-center">
+                  <p class="text-sm text-gray-500">Embed desactivado. Solo se enviara el texto del mensaje.</p>
+                </div>
+
+                <div v-if="currentConfig.embedEnabled" class="flex gap-1 bg-dark-700 p-1 rounded-xl">
+                  <button v-for="tab in embedTabs" :key="tab.id" @click="activeEmbedTab = tab.id"
+                    :class="activeEmbedTab === tab.id ? 'bg-discord text-white' : 'text-gray-400 hover:text-white'"
+                    class="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all">
+                    {{ tab.label }}
+                  </button>
+                </div>
+
+                <!-- General Tab -->
+                <div v-if="activeEmbedTab === 'general' && currentConfig.embedEnabled" class="space-y-3">
+                  <input v-model="currentConfig.embed.title" @change="saveConfig" placeholder="Titulo del embed"
+                    class="w-full bg-dark-700 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-discord outline-none">
+                  <textarea v-model="currentConfig.embed.description" @change="saveConfig" rows="3" placeholder="Descripcion del embed"
+                    class="w-full bg-dark-700 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-discord outline-none resize-none"></textarea>
+                  <div class="flex gap-3 items-start">
+                    <div class="flex-1">
+                      <label class="block text-xs text-gray-500 mb-1">Color</label>
+                      <div class="flex items-center gap-2">
+                        <input type="color" v-model="currentConfig.embed.color" @change="saveConfig">
+                        <div class="flex gap-1">
+                          <button v-for="c in colorPresets" :key="c" @click="currentConfig.embed.color = c; saveConfig()" class="w-6 h-6 rounded-full border-2 border-transparent hover:border-white transition-all" :style="{ background: c }"></button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <!-- Thumbnail -->
+                  <div>
+                    <label class="block text-xs text-gray-500 mb-1">Thumbnail</label>
+                    <div class="flex gap-2">
+                      <input v-model="currentConfig.embed.thumbnail" @change="saveConfig" placeholder="URL o sube una imagen"
+                        class="flex-1 bg-dark-700 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-discord outline-none">
+                      <label class="upload-zone flex items-center gap-2 px-4 py-2.5 bg-dark-600 hover:bg-discord/20 border border-gray-700 hover:border-discord rounded-xl text-sm cursor-pointer transition-all">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                        Subir
+                        <input type="file" accept="image/*" @change="e => uploadImage(e, 'thumbnail')" class="hidden">
+                      </label>
+                    </div>
+                    <img v-if="currentConfig.embed.thumbnail" :src="currentConfig.embed.thumbnail" class="mt-2 w-16 h-16 rounded-lg object-cover border border-gray-700">
+                  </div>
+                  <!-- Image -->
+                  <div>
+                    <label class="block text-xs text-gray-500 mb-1">Imagen</label>
+                    <div class="flex gap-2">
+                      <input v-model="currentConfig.embed.image" @change="saveConfig" placeholder="URL o sube una imagen"
+                        class="flex-1 bg-dark-700 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-discord outline-none">
+                      <label class="upload-zone flex items-center gap-2 px-4 py-2.5 bg-dark-600 hover:bg-discord/20 border border-gray-700 hover:border-discord rounded-xl text-sm cursor-pointer transition-all">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                        Subir
+                        <input type="file" accept="image/*" @change="e => uploadImage(e, 'image')" class="hidden">
+                      </label>
+                    </div>
+                    <img v-if="currentConfig.embed.image" :src="currentConfig.embed.image" class="mt-2 w-full max-h-32 rounded-lg object-cover border border-gray-700">
+                  </div>
+                </div>
+
+                <!-- Author Tab -->
+                <div v-if="activeEmbedTab === 'author' && currentConfig.embedEnabled" class="space-y-3">
+                  <input v-model="currentConfig.embed.author.name" @change="saveConfig" placeholder="Nombre del autor"
+                    class="w-full bg-dark-700 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-discord outline-none">
+                  <div>
+                    <label class="block text-xs text-gray-500 mb-1">Icono del autor</label>
+                    <div class="flex gap-2">
+                      <input v-model="currentConfig.embed.author.iconUrl" @change="saveConfig" placeholder="URL o sube una imagen"
+                        class="flex-1 bg-dark-700 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-discord outline-none">
+                      <label class="upload-zone flex items-center gap-2 px-4 py-2.5 bg-dark-600 hover:bg-discord/20 border border-gray-700 hover:border-discord rounded-xl text-sm cursor-pointer transition-all">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                        Subir
+                        <input type="file" accept="image/*" @change="e => uploadImage(e, 'author.iconUrl')" class="hidden">
+                      </label>
+                    </div>
+                    <img v-if="currentConfig.embed.author.iconUrl" :src="currentConfig.embed.author.iconUrl" class="mt-2 w-10 h-10 rounded-full object-cover border border-gray-700">
+                  </div>
+                  <input v-model="currentConfig.embed.author.url" @change="saveConfig" placeholder="URL del autor (click)"
+                    class="w-full bg-dark-700 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-discord outline-none">
+                </div>
+
+                <!-- Footer Tab -->
+                <div v-if="activeEmbedTab === 'footer' && currentConfig.embedEnabled" class="space-y-3">
+                  <input v-model="currentConfig.embed.footer.text" @change="saveConfig" placeholder="Texto del footer"
+                    class="w-full bg-dark-700 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-discord outline-none">
+                  <div>
+                    <label class="block text-xs text-gray-500 mb-1">Icono del footer</label>
+                    <div class="flex gap-2">
+                      <input v-model="currentConfig.embed.footer.iconUrl" @change="saveConfig" placeholder="URL o sube una imagen"
+                        class="flex-1 bg-dark-700 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-discord outline-none">
+                      <label class="upload-zone flex items-center gap-2 px-4 py-2.5 bg-dark-600 hover:bg-discord/20 border border-gray-700 hover:border-discord rounded-xl text-sm cursor-pointer transition-all">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                        Subir
+                        <input type="file" accept="image/*" @change="e => uploadImage(e, 'footer.iconUrl')" class="hidden">
+                      </label>
+                    </div>
+                    <img v-if="currentConfig.embed.footer.iconUrl" :src="currentConfig.embed.footer.iconUrl" class="mt-2 w-10 h-10 rounded-full object-cover border border-gray-700">
+                  </div>
+                </div>
+
+                <!-- Fields Tab -->
+                <div v-if="activeEmbedTab === 'fields' && currentConfig.embedEnabled" class="space-y-3">
+                  <div v-for="(field, idx) in currentConfig.embed.fields" :key="idx" class="bg-dark-700 rounded-xl p-3 space-y-2">
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs text-gray-500">Field #{{ idx + 1 }}</span>
+                      <button @click="currentConfig.embed.fields.splice(idx, 1); saveConfig()" class="text-accent-red hover:text-red-400 text-xs">Eliminar</button>
+                    </div>
+                    <input v-model="field.name" @change="saveConfig" placeholder="Nombre"
+                      class="w-full bg-dark-600 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-discord outline-none">
+                    <input v-model="field.value" @change="saveConfig" placeholder="Valor"
+                      class="w-full bg-dark-600 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-discord outline-none">
+                    <label class="flex items-center gap-2 text-xs text-gray-400 cursor-pointer">
+                      <input type="checkbox" v-model="field.inline" @change="saveConfig" class="rounded"> Inline
+                    </label>
+                  </div>
+                  <button @click="addField" class="w-full py-2 border-2 border-dashed border-gray-700 hover:border-discord rounded-xl text-sm text-gray-400 hover:text-discord transition-all">
+                    + Agregar Field
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Send Preview Button -->
+            <div class="mt-6 flex items-center justify-end gap-3">
+              <div class="flex items-center gap-2">
+                <label class="text-xs text-gray-500">Miembro:</label>
+                <select v-model="previewMember" class="bg-dark-700 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-discord focus:outline-none transition-colors max-w-[200px]">
+                  <option value="">Bot (default)</option>
+                  <option v-for="m in members" :key="m.id" :value="m.id">{{ m.username }}</option>
+                </select>
+              </div>
+              <button @click="sendPreview" :disabled="sendingPreview"
+                class="flex items-center gap-2 px-5 py-2.5 bg-discord hover:bg-discord-hover disabled:opacity-50 rounded-xl text-sm font-medium transition-all">
+                <svg v-if="!sendingPreview" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                <svg v-else class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                {{ sendingPreview ? 'Enviando...' : 'Mandar Preview' }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Live Preview -->
+          <div class="bg-card rounded-2xl p-6 border border-gray-800">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="font-semibold">Vista previa en vivo</h3>
+              <span class="text-xs text-gray-500">Se actualiza automaticamente</span>
+            </div>
+            <div class="bg-dark-700 rounded-xl p-5">
+              <div v-if="currentConfig.embedEnabled && currentConfig.embed.author?.name" class="flex items-center gap-2 mb-2">
+                <img v-if="currentConfig.embed.author.iconUrl" :src="currentConfig.embed.author.iconUrl" class="w-6 h-6 rounded-full">
+                <span class="text-sm font-semibold">{{ replacePreview(currentConfig.embed.author.name) }}</span>
+              </div>
+              <div v-if="currentConfig.message" class="text-sm text-gray-300" :class="currentConfig.embedEnabled ? 'mb-3' : ''">{{ replacePreview(currentConfig.message) }}</div>
+              <div v-if="currentConfig.embedEnabled" class="embed-preview p-4" :style="{ borderColor: currentConfig.embed.color || '#5865F2' }">
+                <div class="flex gap-4">
+                  <div class="flex-1 min-w-0">
+                    <p v-if="currentConfig.embed.title" class="font-semibold text-sm mb-1">{{ replacePreview(currentConfig.embed.title) }}</p>
+                    <p v-if="currentConfig.embed.description" class="text-sm text-gray-300 whitespace-pre-wrap">{{ replacePreview(currentConfig.embed.description) }}</p>
+                    <div v-if="currentConfig.embed.fields?.length > 0" class="mt-3 grid gap-3" :class="hasInlineFields ? 'grid-cols-2' : 'grid-cols-1'">
+                      <div v-for="(field, idx) in currentConfig.embed.fields" :key="idx" :class="field.inline ? 'col-span-1' : 'col-span-2'">
+                        <p class="text-xs font-semibold mb-0.5">{{ replacePreview(field.name || 'Field') }}</p>
+                        <p class="text-xs text-gray-400">{{ replacePreview(field.value || 'Valor') }}</p>
+                      </div>
+                    </div>
+                  </div>
+                  <img v-if="currentConfig.embed.thumbnail" :src="currentConfig.embed.thumbnail" class="w-20 h-20 rounded-lg object-cover flex-shrink-0">
+                </div>
+                <img v-if="currentConfig.embed.image" :src="currentConfig.embed.image" class="mt-3 w-full max-h-64 rounded-lg object-cover">
+                <div v-if="currentConfig.embed.footer?.text" class="mt-3 flex items-center gap-1.5">
+                  <img v-if="currentConfig.embed.footer.iconUrl" :src="currentConfig.embed.footer.iconUrl" class="w-4 h-4 rounded-full">
+                  <span class="text-xs text-gray-400">{{ replacePreview(currentConfig.embed.footer.text) }}</span>
+                </div>
+              </div>
+              <div v-if="!currentConfig.embedEnabled && currentConfig.message" class="mt-3 p-3 bg-dark-600 rounded-lg">
+                <p class="text-xs text-gray-500 mb-1">Solo texto (sin embed)</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Variables Reference -->
+          <div class="bg-card rounded-2xl p-6 border border-gray-800">
+            <h3 class="font-semibold mb-4">Referencia de Variables</h3>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+              <div v-for="v in availableVars" :key="v.value" class="bg-dark-700 rounded-lg px-3 py-2">
+                <code class="text-xs text-discord font-mono">{{ v.value }}</code>
+                <p class="text-xs text-gray-500 mt-0.5">{{ v.desc }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CARD EDITOR (Welcome/Farewell only) -->
+        <div v-if="(['welcome','farewell'].includes(currentPage)) && selectedGuild" class="max-w-5xl space-y-6">
+          <div class="bg-card rounded-2xl p-6 border border-gray-800">
+            <div class="flex items-center justify-between mb-6">
+              <div>
+                <h3 class="font-semibold text-lg">{{ currentPage === 'welcome' ? 'Card de Bienvenida' : 'Card de Despedida' }}</h3>
+                <p class="text-sm text-gray-500">Imagen personalizada para el mensaje</p>
+              </div>
+              <div class="flex items-center gap-3">
+                <span v-if="saving" class="text-xs text-gray-500 flex items-center gap-1">
+                  <svg class="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                  Guardando...
+                </span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" v-model="currentConfig.card.enabled" class="sr-only peer">
+                  <div class="w-11 h-6 bg-dark-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-discord"></div>
+                </label>
+              </div>
+            </div>
+
+            <div v-if="currentConfig.card.enabled" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-400 mb-2">Tema</label>
+                  <select v-model="currentConfig.card.theme" class="w-full bg-dark-700 border border-gray-700 rounded-xl px-4 py-3 text-sm focus:border-discord focus:outline-none transition-colors">
+                    <option value="dark">Oscuro</option>
+                    <option value="circuit">Circuito</option>
+                    <option value="code">Codigo</option>
+                    <option value="neon">Neon</option>
+                    <option value="sunset">Sunset</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-400 mb-2">Fondo Personalizado</label>
+                  <div class="flex items-center gap-3">
+                    <label class="upload-zone bg-dark-700 hover:bg-dark-600 px-4 py-2 rounded-xl text-sm cursor-pointer border border-gray-700 hover:border-discord/50 transition-all">
+                      Subir imagen
+                      <input type="file" accept="image/*" @change="e => uploadCardBg(e, currentPage)" class="hidden">
+                    </label>
+                    <button v-if="currentConfig.card.background" @click="currentConfig.card.background = ''" class="text-xs text-accent-red hover:text-red-400 transition-colors">Eliminar</button>
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-400 mb-2">Titulo</label>
+                  <input v-model="currentConfig.card.title" class="w-full bg-dark-700 border border-gray-700 rounded-xl px-4 py-3 text-sm focus:border-discord focus:outline-none transition-colors" :placeholder="currentPage === 'welcome' ? 'Bienvenido' : 'Adios'">
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-400 mb-2">Subtitulo</label>
+                  <input v-model="currentConfig.card.subtitle" class="w-full bg-dark-700 border border-gray-700 rounded-xl px-4 py-3 text-sm focus:border-discord focus:outline-none transition-colors" :placeholder="currentPage === 'welcome' ? 'Miembro #{memberCount}' : 'Te extranaremos'">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">Color Texto</label>
+                    <div class="flex items-center gap-2">
+                      <input type="color" v-model="currentConfig.card.textColor" class="w-10 h-10 rounded-lg cursor-pointer">
+                      <span class="text-xs text-gray-500">{{ currentConfig.card.textColor }}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">Color Borde Avatar</label>
+                    <div class="flex items-center gap-2">
+                      <input type="color" v-model="currentConfig.card.avatarBorderColor" class="w-10 h-10 rounded-lg cursor-pointer">
+                      <span class="text-xs text-gray-500">{{ currentConfig.card.avatarBorderColor }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-400 mb-2">Ancho Borde: {{ currentConfig.card.avatarBorderWidth }}px</label>
+                  <input type="range" v-model.number="currentConfig.card.avatarBorderWidth" min="0" max="15" class="w-full accent-discord">
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-400 mb-2">Opacidad Fondo: {{ currentConfig.card.overlayOpacity }}%</label>
+                  <input type="range" v-model.number="currentConfig.card.overlayOpacity" min="0" max="100" class="w-full accent-discord">
+                </div>
+
+                <div class="flex items-center justify-between p-3 bg-dark-700 rounded-xl">
+                  <div>
+                    <p class="text-sm font-medium">Animar (GIF)</p>
+                    <p class="text-xs text-gray-500">Genera GIF animado en vez de PNG</p>
+                  </div>
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" v-model="currentConfig.card.animated" class="sr-only peer">
+                    <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent-green"></div>
+                  </label>
+                </div>
+
+                <button @click="saveConfig" :disabled="saving" class="bg-discord hover:bg-discord-hover px-6 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 disabled:opacity-50">
+                  Guardar Card
+                </button>
+              </div>
+
+              <div class="bg-dark-700 rounded-xl p-4">
+                <div class="flex items-center justify-between mb-3">
+                  <p class="text-xs text-gray-500">Vista Previa (automatica)</p>
+                  <span v-if="cardPreviewLoading" class="text-xs text-discord flex items-center gap-1">
+                    <svg class="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                    Generando...
+                  </span>
+                </div>
+                <div v-if="(currentPage === 'welcome' ? welcomeCardPreview : farewellCardPreview)" class="rounded-lg overflow-hidden border border-gray-700">
+                  <img :src="currentPage === 'welcome' ? welcomeCardPreview : farewellCardPreview" class="w-full">
+                </div>
+                <div v-else class="w-full h-40 bg-dark-600 rounded-lg flex items-center justify-center border border-gray-700">
+                  <p class="text-gray-500 text-sm">Activa la card para ver preview</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- AUTO-ROLE -->
+        <div v-if="currentPage === 'autorole' && selectedGuild" class="max-w-5xl space-y-6">
+          <div class="bg-card rounded-2xl p-6 border border-gray-800">
+            <div class="flex items-center justify-between mb-6">
+              <div>
+                <h3 class="font-semibold text-lg">Auto-Role</h3>
+                <p class="text-sm text-gray-500">Asigna un rol automaticamente a nuevos miembros</p>
+              </div>
+              <div class="flex items-center gap-3">
+                <span v-if="saving" class="text-xs text-gray-500 flex items-center gap-1">
+                  <svg class="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                  Guardando...
+                </span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" v-model="autoRoleConfig.enabled" class="sr-only peer">
+                  <div class="w-11 h-6 bg-dark-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-discord"></div>
+                </label>
+              </div>
+            </div>
+            <div v-if="autoRoleConfig.enabled" class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-400 mb-2">Rol a asignar</label>
+                <select v-model="autoRoleConfig.roleId" class="w-full bg-dark-700 border border-gray-700 rounded-xl px-4 py-3 text-sm focus:border-discord focus:outline-none transition-colors">
+                  <option value="">Selecciona un rol</option>
+                  <option v-for="role in roles" :key="role.id" :value="role.id">{{ role.name }}</option>
+                </select>
+              </div>
+              <button @click="saveAutoRole" :disabled="saving" class="bg-discord hover:bg-discord-hover px-6 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 disabled:opacity-50">
+                Guardar Auto-Role
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- AUTOMOD -->
+        <div v-if="currentPage === 'automod' && selectedGuild" class="max-w-5xl space-y-6">
+          <div class="bg-card rounded-2xl p-6 border border-gray-800">
+            <div class="flex items-center justify-between mb-6">
+              <div>
+                <h3 class="font-semibold text-lg">Auto-Moderación</h3>
+                <p class="text-sm text-gray-500">Filtros automaticos para mantener el chat limpio</p>
+              </div>
+              <div class="flex items-center gap-3">
+                <span v-if="saving" class="text-xs text-gray-500 flex items-center gap-1">
+                  <svg class="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                  Guardando...
+                </span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" v-model="automodConfig.enabled" class="sr-only peer">
+                  <div class="w-11 h-6 bg-dark-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-discord"></div>
+                </label>
+              </div>
+            </div>
+
+            <div v-if="automodConfig.enabled" class="space-y-6">
+              <!-- Anti-Spam -->
+              <div class="bg-dark-700 rounded-xl p-4 border border-gray-700">
+                <div class="flex items-center justify-between mb-3">
+                  <div>
+                    <h4 class="font-medium">Anti-Spam</h4>
+                    <p class="text-xs text-gray-500">Detecta mensajes repetidos rapidamente</p>
+                  </div>
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" v-model="automodConfig.antiSpam.enabled" class="sr-only peer">
+                    <div class="w-11 h-6 bg-dark-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-discord"></div>
+                  </label>
+                </div>
+                <div v-if="automodConfig.antiSpam.enabled" class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-xs text-gray-400 mb-1">Max mensajes</label>
+                    <input type="number" v-model.number="automodConfig.antiSpam.maxMessages" min="2" max="20" class="w-full bg-dark-600 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:border-discord focus:outline-none">
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-400 mb-1">Ventana (ms)</label>
+                    <input type="number" v-model.number="automodConfig.antiSpam.interval" min="1000" max="30000" step="1000" class="w-full bg-dark-600 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:border-discord focus:outline-none">
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-400 mb-1">Accion</label>
+                    <select v-model="automodConfig.antiSpam.action" class="w-full bg-dark-600 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:border-discord focus:outline-none">
+                      <option value="delete">Eliminar</option>
+                      <option value="mute">Silenciar</option>
+                      <option value="kick">Expulsar</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Anti-Links -->
+              <div class="bg-dark-700 rounded-xl p-4 border border-gray-700">
+                <div class="flex items-center justify-between mb-3">
+                  <div>
+                    <h4 class="font-medium">Anti-Links</h4>
+                    <p class="text-xs text-gray-500">Bloquea links no permitidos</p>
+                  </div>
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" v-model="automodConfig.antiLinks.enabled" class="sr-only peer">
+                    <div class="w-11 h-6 bg-dark-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-discord"></div>
+                  </label>
+                </div>
+                <div v-if="automodConfig.antiLinks.enabled" class="space-y-3">
+                  <div>
+                    <label class="block text-xs text-gray-400 mb-1">Accion</label>
+                    <select v-model="automodConfig.antiLinks.action" class="w-full bg-dark-600 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:border-discord focus:outline-none">
+                      <option value="delete">Eliminar</option>
+                      <option value="mute">Silenciar</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-400 mb-1">Dominios permitidos (separados por coma)</label>
+                    <input type="text" v-model="automodConfig.antiLinks.whitelistedDomains" placeholder="youtube.com, twitch.tv, discord.gg" class="w-full bg-dark-600 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:border-discord focus:outline-none">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Anti-Caps -->
+              <div class="bg-dark-700 rounded-xl p-4 border border-gray-700">
+                <div class="flex items-center justify-between mb-3">
+                  <div>
+                    <h4 class="font-medium">Anti-Caps</h4>
+                    <p class="text-xs text-gray-500">Limita el uso excesivo de mayusculas</p>
+                  </div>
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" v-model="automodConfig.antiCaps.enabled" class="sr-only peer">
+                    <div class="w-11 h-6 bg-dark-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-discord"></div>
+                  </label>
+                </div>
+                <div v-if="automodConfig.antiCaps.enabled" class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-xs text-gray-400 mb-1">Minimo letras</label>
+                    <input type="number" v-model.number="automodConfig.antiCaps.minLetters" min="3" max="50" class="w-full bg-dark-600 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:border-discord focus:outline-none">
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-400 mb-1">Max % mayusculas</label>
+                    <input type="number" v-model.number="automodConfig.antiCaps.maxPercentage" min="30" max="100" class="w-full bg-dark-600 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:border-discord focus:outline-none">
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-400 mb-1">Accion</label>
+                    <select v-model="automodConfig.antiCaps.action" class="w-full bg-dark-600 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:border-discord focus:outline-none">
+                      <option value="delete">Eliminar</option>
+                      <option value="mute">Silenciar</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Banned Words -->
+              <div class="bg-dark-700 rounded-xl p-4 border border-gray-700">
+                <div class="flex items-center justify-between mb-3">
+                  <div>
+                    <h4 class="font-medium">Palabras Prohibidas</h4>
+                    <p class="text-xs text-gray-500">Filtra palabras no permitidas</p>
+                  </div>
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" v-model="automodConfig.bannedWords.enabled" class="sr-only peer">
+                    <div class="w-11 h-6 bg-dark-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-discord"></div>
+                  </label>
+                </div>
+                <div v-if="automodConfig.bannedWords.enabled" class="space-y-3">
+                  <div>
+                    <label class="block text-xs text-gray-400 mb-1">Palabras (separadas por coma)</label>
+                    <input type="text" v-model="automodConfig.bannedWords.wordsStr" placeholder="palabra1, palabra2, ..." class="w-full bg-dark-600 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:border-discord focus:outline-none">
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-400 mb-1">Accion</label>
+                    <select v-model="automodConfig.bannedWords.action" class="w-full bg-dark-600 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:border-discord focus:outline-none">
+                      <option value="delete">Eliminar</option>
+                      <option value="mute">Silenciar</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <button @click="saveAutoMod" :disabled="saving" class="bg-discord hover:bg-discord-hover px-6 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 disabled:opacity-50">
+                Guardar Auto-Moderación
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- LOGGING -->
+        <div v-if="currentPage === 'logging' && selectedGuild" class="max-w-5xl space-y-6">
+          <div class="bg-card rounded-2xl p-6 border border-gray-800">
+            <div class="flex items-center justify-between mb-6">
+              <div>
+                <h3 class="font-semibold text-lg">Logging Automatico</h3>
+                <p class="text-sm text-gray-500">El bot registra eventos automaticamente en el system channel o el primer canal de texto disponible</p>
+              </div>
+              <span v-if="saving" class="text-xs text-gray-500 flex items-center gap-1">
+                <svg class="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                Guardando...
+              </span>
+            </div>
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-400 mb-2">Canal de logs (opcional)</label>
+                <select v-model="loggingConfig.channel" class="w-full bg-dark-700 border border-gray-700 rounded-xl px-4 py-3 text-sm focus:border-discord focus:outline-none transition-colors">
+                  <option value="">Automatico (system channel)</option>
+                  <option v-for="ch in channels" :key="ch.id" :value="ch.id">#{{ ch.name }}</option>
+                </select>
+                <p class="text-xs text-gray-600 mt-1">Si lo dejas en automatico, el bot usa el system channel o el primer canal de texto visible</p>
+              </div>
+              <div class="grid grid-cols-2 gap-4">
+                <label class="flex items-center gap-3 p-3 bg-dark-700 rounded-xl border border-gray-700 cursor-pointer hover:border-discord/50 transition-colors">
+                  <input type="checkbox" v-model="loggingConfig.messageDelete" class="w-4 h-4 rounded border-gray-600 bg-dark-600 text-discord focus:ring-discord focus:ring-offset-0">
+                  <span class="text-sm">Mensajes eliminados</span>
+                </label>
+                <label class="flex items-center gap-3 p-3 bg-dark-700 rounded-xl border border-gray-700 cursor-pointer hover:border-discord/50 transition-colors">
+                  <input type="checkbox" v-model="loggingConfig.messageUpdate" class="w-4 h-4 rounded border-gray-600 bg-dark-600 text-discord focus:ring-discord focus:ring-offset-0">
+                  <span class="text-sm">Mensajes editados</span>
+                </label>
+                <label class="flex items-center gap-3 p-3 bg-dark-700 rounded-xl border border-gray-700 cursor-pointer hover:border-discord/50 transition-colors">
+                  <input type="checkbox" v-model="loggingConfig.voiceStateUpdate" class="w-4 h-4 rounded border-gray-600 bg-dark-600 text-discord focus:ring-discord focus:ring-offset-0">
+                  <span class="text-sm">Voz (entrar/salir)</span>
+                </label>
+                <label class="flex items-center gap-3 p-3 bg-dark-700 rounded-xl border border-gray-700 cursor-pointer hover:border-discord/50 transition-colors">
+                  <input type="checkbox" v-model="loggingConfig.roleUpdate" class="w-4 h-4 rounded border-gray-600 bg-dark-600 text-discord focus:ring-discord focus:ring-offset-0">
+                  <span class="text-sm">Cambios de roles</span>
+                </label>
+              </div>
+              <button @click="saveLogging" :disabled="saving" class="bg-discord hover:bg-discord-hover px-6 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 disabled:opacity-50">
+                Guardar Logging
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- COMMANDS -->
+        <div v-if="currentPage === 'commands'" class="max-w-3xl">
+          <div class="bg-card rounded-2xl p-6 border border-gray-800">
+            <h3 class="font-semibold text-lg mb-4">Comandos Disponibles</h3>
+            <div class="space-y-3">
+              <div v-for="cmd in commands" :key="cmd.name" class="flex items-center justify-between p-4 bg-dark-700 rounded-xl">
+                <div>
+                  <p class="font-medium font-mono text-discord">/{{ cmd.name }}</p>
+                  <p class="text-sm text-gray-500">{{ cmd.description }}</p>
+                </div>
+                <span class="px-3 py-1 bg-discord/20 text-discord text-xs rounded-full font-medium">Slash</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SETTINGS -->
+        <div v-if="currentPage === 'settings'" class="max-w-3xl space-y-6">
+          <div class="bg-card rounded-2xl p-6 border border-gray-800">
+            <h3 class="font-semibold text-lg mb-6">Personalizar Dashboard</h3>
+            <div class="space-y-6">
+              <!-- Logo Upload -->
+              <div>
+                <label class="block text-sm font-medium text-gray-400 mb-3">Logo del Dashboard</label>
+                <div class="flex items-center gap-4">
+                  <div class="w-16 h-16 rounded-xl overflow-hidden bg-dark-700 flex items-center justify-center">
+                    <img v-if="dashboardConfig.logo" :src="dashboardConfig.logo" class="w-full h-full object-cover">
+                    <svg v-else class="w-8 h-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                  </div>
+                  <label class="upload-zone bg-dark-700 hover:bg-dark-600 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer border border-gray-700 hover:border-discord/50">
+                    Cambiar Logo
+                    <input type="file" accept="image/*" @change="uploadDashboardLogo" class="hidden">
+                  </label>
+                  <button v-if="dashboardConfig.logo" @click="dashboardConfig.logo = ''; saveDashboardConfig()" class="text-xs text-accent-red hover:text-red-400 transition-colors">Eliminar</button>
+                </div>
+                <p class="text-xs text-gray-600 mt-2">Se muestra en la barra lateral. Formato: PNG, JPG. Recomendado: 128x128px</p>
+              </div>
+
+              <!-- Title -->
+              <div>
+                <label class="block text-sm font-medium text-gray-400 mb-2">Titulo del Dashboard</label>
+                <input v-model="dashboardConfig.title" class="w-full bg-dark-700 border border-gray-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-discord focus:border-transparent outline-none transition-all" placeholder="Hazuru's Assistant">
+              </div>
+
+              <!-- Subtitle -->
+              <div>
+                <label class="block text-sm font-medium text-gray-400 mb-2">Subtitulo</label>
+                <input v-model="dashboardConfig.subtitle" class="w-full bg-dark-700 border border-gray-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-discord focus:border-transparent outline-none transition-all" placeholder="Dashboard">
+              </div>
+
+              <button @click="saveDashboardConfig" class="bg-discord hover:bg-discord-hover px-6 py-2.5 rounded-xl text-sm font-medium transition-all duration-200">
+                Guardar Ajustes
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

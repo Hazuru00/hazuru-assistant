@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+
+# Runtime data (contienen IDs reales de servidores/usuarios)
+src/database/guilds.json
+src/database/warnings.json
+src/database/reminders.json
+
+# Uploads de usuarios (imágenes de fondo para tarjetas)
+uploads/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Docker
+.dockerignore
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing / Coverage (si se añade)
+coverage/
+.nyc_output/
+
+# TypeScript cache (si se migra)
+*.tsbuildinfo

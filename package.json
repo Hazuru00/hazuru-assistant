@@ -1,0 +1,23 @@
+{
+  "name": "hazurus-assistant",
+  "version": "1.0.0",
+  "description": "Hazuru's Assistant - Discord Bot",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "frontend": "npx serve frontend -p 3000"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "^0.1.100",
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "multer": "^2.2.0",
+    "omggif": "^1.0.10",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}

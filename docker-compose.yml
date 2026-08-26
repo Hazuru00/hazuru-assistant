@@ -1,0 +1,27 @@
+services:
+  bot:
+    build: .
+    env_file: .env
+    restart: unless-stopped
+    network_mode: host
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    volumes:
+      - ./src:/app/src
+      - ./frontend:/app/frontend
+
+  watch:
+    build: .
+    env_file: .env
+    restart: unless-stopped
+    profiles:
+      - dev
+    network_mode: host
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    volumes:
+      - ./src:/app/src
+      - ./frontend:/app/frontend
+    command: npx nodemon src/index.js
