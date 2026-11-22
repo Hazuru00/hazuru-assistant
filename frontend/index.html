@@ -228,14 +228,18 @@
                 </div>
                 <div>
                   <label class="block text-sm font-medium text-gray-400 mb-2">Mensaje (texto plano)</label>
-                  <textarea aria-label="Mensaje" v-model="currentConfig.message" @change="saveConfig" rows="3"
+                  <textarea aria-label="Mensaje" :value="currentConfig.message" @input="onEditorInput($event, currentConfig, 'message')" @keydown="onEditorKeydown" @blur="cerrarAutocompletado" @change="saveConfig" rows="3"
                     class="w-full bg-dark-700 border border-gray-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-discord focus:border-transparent outline-none transition-all resize-none"
-                    placeholder="Escribe tu mensaje..."></textarea>
+                    placeholder="Escribe { para ver variables y funciones..."></textarea>
+                  <p class="text-[11px] text-gray-500 mt-1.5">Escribe <code class="text-discord">{</code> para autocompletar variables, arrays y funciones.</p>
                 </div>
                 <div class="bg-dark-700 rounded-xl p-3">
-                  <p class="text-xs font-medium text-gray-400 mb-2">Variables (click para copiar):</p>
+                  <div class="flex items-center justify-between mb-2">
+                    <p class="text-xs font-medium text-gray-400">Variables (click para copiar):</p>
+                    <button @click="abrirGuia" class="text-xs text-discord hover:text-white transition-colors">Ver guía de sintaxis →</button>
+                  </div>
                   <div class="flex flex-wrap gap-1.5">
-                    <button v-for="v in availableVars" :key="v.value" @click="copyVar(v.value)"
+                    <button v-for="v in variablesReferencia" :key="v.value" @click="copyVar(v.value)"
                       class="px-2 py-1 bg-dark-600 hover:bg-discord/20 hover:text-discord rounded-lg text-xs font-mono transition-colors cursor-pointer" :title="v.desc">
                       {{ v.value }}
                     </button>
@@ -274,9 +278,9 @@
 
                 <!-- General Tab -->
                 <div v-if="activeEmbedTab === 'general' && currentConfig.embedEnabled" class="space-y-3">
-                  <input aria-label="Título del embed" v-model="currentConfig.embed.title" @change="saveConfig" placeholder="Titulo del embed"
+                  <input aria-label="Título del embed" :value="currentConfig.embed.title" @input="onEditorInput($event, currentConfig.embed, 'title')" @keydown="onEditorKeydown" @blur="cerrarAutocompletado" @change="saveConfig" placeholder="Titulo del embed"
                     class="w-full bg-dark-700 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-discord outline-none">
-                  <textarea aria-label="Descripción del embed" v-model="currentConfig.embed.description" @change="saveConfig" rows="3" placeholder="Descripcion del embed"
+                  <textarea aria-label="Descripción del embed" :value="currentConfig.embed.description" @input="onEditorInput($event, currentConfig.embed, 'description')" @keydown="onEditorKeydown" @blur="cerrarAutocompletado" @change="saveConfig" rows="3" placeholder="Descripcion del embed"
                     class="w-full bg-dark-700 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-discord outline-none resize-none"></textarea>
                   <div class="flex gap-3 items-start">
                     <div class="flex-1">
@@ -321,7 +325,7 @@
 
                 <!-- Author Tab -->
                 <div v-if="activeEmbedTab === 'author' && currentConfig.embedEnabled" class="space-y-3">
-                  <input aria-label="Nombre del autor" v-model="currentConfig.embed.author.name" @change="saveConfig" placeholder="Nombre del autor"
+                  <input aria-label="Nombre del autor" :value="currentConfig.embed.author.name" @input="onEditorInput($event, currentConfig.embed.author, 'name')" @keydown="onEditorKeydown" @blur="cerrarAutocompletado" @change="saveConfig" placeholder="Nombre del autor"
                     class="w-full bg-dark-700 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-discord outline-none">
                   <div>
                     <label class="block text-xs text-gray-500 mb-1">Icono del autor</label>
@@ -342,7 +346,7 @@
 
                 <!-- Footer Tab -->
                 <div v-if="activeEmbedTab === 'footer' && currentConfig.embedEnabled" class="space-y-3">
-                  <input aria-label="Texto del pie" v-model="currentConfig.embed.footer.text" @change="saveConfig" placeholder="Texto del footer"
+                  <input aria-label="Texto del pie" :value="currentConfig.embed.footer.text" @input="onEditorInput($event, currentConfig.embed.footer, 'text')" @keydown="onEditorKeydown" @blur="cerrarAutocompletado" @change="saveConfig" placeholder="Texto del footer"
                     class="w-full bg-dark-700 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-discord outline-none">
                   <div>
                     <label class="block text-xs text-gray-500 mb-1">Icono del footer</label>
@@ -366,9 +370,9 @@
                       <span class="text-xs text-gray-500">Field #{{ idx + 1 }}</span>
                       <button @click="currentConfig.embed.fields.splice(idx, 1); saveConfig()" class="text-accent-red hover:text-red-400 text-xs">Eliminar</button>
                     </div>
-                    <input aria-label="Nombre del campo" v-model="field.name" @change="saveConfig" placeholder="Nombre"
+                    <input aria-label="Nombre del campo" :value="field.name" @input="onEditorInput($event, field, 'name')" @keydown="onEditorKeydown" @blur="cerrarAutocompletado" @change="saveConfig" placeholder="Nombre"
                       class="w-full bg-dark-600 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-discord outline-none">
-                    <input aria-label="Valor del campo" v-model="field.value" @change="saveConfig" placeholder="Valor"
+                    <input aria-label="Valor del campo" :value="field.value" @input="onEditorInput($event, field, 'value')" @keydown="onEditorKeydown" @blur="cerrarAutocompletado" @change="saveConfig" placeholder="Valor"
                       class="w-full bg-dark-600 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-discord outline-none">
                     <label class="flex items-center gap-2 text-xs text-gray-400 cursor-pointer">
                       <input aria-label="Campo en línea" type="checkbox" v-model="field.inline" @change="saveConfig" class="rounded"> Inline
@@ -441,7 +445,7 @@
           <div class="bg-card rounded-2xl p-6 border border-gray-800">
             <h3 class="font-semibold mb-4">Referencia de Variables</h3>
             <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-              <div v-for="v in availableVars" :key="v.value" class="bg-dark-700 rounded-lg px-3 py-2">
+              <div v-for="v in variablesReferencia" :key="v.value" class="bg-dark-700 rounded-lg px-3 py-2">
                 <code class="text-xs text-discord font-mono">{{ v.value }}</code>
                 <p class="text-xs text-gray-500 mt-0.5">{{ v.desc }}</p>
               </div>
@@ -1642,6 +1646,280 @@
           </div>
         </div>
 
+        <!-- VARIABLES Y PLANTILLAS -->
+        <div v-if="currentPage === 'variables'" class="w-full space-y-6">
+          <!-- Barra de acciones -->
+          <div class="bg-card rounded-2xl p-4 border border-gray-800 flex flex-wrap items-center gap-3">
+            <div class="flex gap-1 bg-dark-700 p-1 rounded-xl" role="tablist" aria-label="Secciones de variables">
+              <button v-for="tab in [{ id: 'variables', label: 'Variables' }, { id: 'plantillas', label: 'Plantillas' }, { id: 'guia', label: 'Guía de sintaxis' }]" :key="tab.id"
+                @click="variablesTab = tab.id" role="tab" :aria-selected="variablesTab === tab.id"
+                :class="variablesTab === tab.id ? 'bg-discord text-white' : 'text-gray-400 hover:text-white'"
+                class="px-4 py-2 rounded-lg text-sm font-medium transition-all">{{ tab.label }}</button>
+            </div>
+            <div class="flex-1 min-w-[120px]"></div>
+            <input v-if="variablesTab !== 'guia'" v-model="filtroVariables" type="search" aria-label="Filtrar por nombre"
+              placeholder="Filtrar por nombre..." class="bg-dark-700 border border-gray-700 rounded-xl px-3 py-2 text-sm w-48 focus:ring-2 focus:ring-discord outline-none">
+            <button v-if="variablesTab === 'variables'" @click="agregarVariable"
+              class="px-4 py-2 bg-dark-600 hover:bg-discord/20 hover:text-discord rounded-xl text-sm font-medium transition-colors">+ Variable</button>
+            <button v-if="variablesTab === 'plantillas'" @click="agregarPlantilla"
+              class="px-4 py-2 bg-dark-600 hover:bg-discord/20 hover:text-discord rounded-xl text-sm font-medium transition-colors">+ Plantilla</button>
+            <button v-if="variablesTab !== 'guia'" @click="guardarVariables" :disabled="guardandoVariables"
+              class="px-4 py-2 bg-discord hover:bg-discord-hover disabled:opacity-50 text-white rounded-xl text-sm font-medium transition-colors">
+              {{ guardandoVariables ? 'Guardando...' : 'Guardar cambios' }}</button>
+            <button v-if="variablesTab !== 'guia'" @click="cargarVariables" class="px-3 py-2 text-xs text-gray-400 hover:text-white transition-colors">Recargar</button>
+          </div>
+
+          <datalist id="idsServidores">
+            <option v-for="g in guilds" :key="g.id" :value="g.id">{{ g.name }}</option>
+          </datalist>
+
+          <p v-if="cargandoVariables" class="text-sm text-gray-500">Cargando biblioteca...</p>
+
+          <!-- PESTAÑA VARIABLES -->
+          <div v-if="variablesTab === 'variables' && !cargandoVariables" class="space-y-4">
+            <div v-for="(f, idx) in variablesFiltradas" :key="f._ui" class="bg-card rounded-2xl border border-gray-800 overflow-hidden">
+              <div class="flex items-center gap-3 p-4 cursor-pointer hover:bg-card-hover transition-colors"
+                @click="filaAbierta = filaAbierta === f._ui ? '' : f._ui" :aria-expanded="filaAbierta === f._ui">
+                <span class="text-discord font-mono text-sm shrink-0">{}</span>
+                <div class="min-w-0 flex-1">
+                  <p class="font-medium text-sm truncate">{{ f.nombre || 'Sin nombre' }}</p>
+                  <p class="text-xs text-gray-500 truncate">{{ f.descripcion || (f.tipo === 'array' ? 'Array de valores' : 'Texto') }}</p>
+                </div>
+                <span class="text-[10px] px-2 py-1 rounded-lg shrink-0"
+                  :class="f.tipo === 'array' ? 'bg-accent-pink/15 text-accent-pink' : 'bg-discord/15 text-discord'">{{ f.tipo }}</span>
+                <span class="text-[10px] px-2 py-1 rounded-lg bg-dark-700 text-gray-400 shrink-0">{{ f.global ? 'Global' : (f.servidores || []).length + ' serv.' }}</span>
+                <button @click.stop="quitarFila(filasVariables, filasVariables.indexOf(f))" class="text-gray-500 hover:text-accent-red p-1 shrink-0"
+                  :aria-label="'Eliminar variable ' + f.nombre">✕</button>
+              </div>
+
+              <div v-if="filaAbierta === f._ui" class="px-4 pb-5 pt-4 border-t border-gray-800/60 space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label class="block">
+                    <span class="block text-xs text-gray-400 mb-1">Nombre (sin llaves)</span>
+                    <input v-model="f.nombre" aria-label="Nombre de la variable" placeholder="Saludos"
+                      class="w-full bg-dark-700 border border-gray-700 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-discord outline-none">
+                  </label>
+                  <label class="block">
+                    <span class="block text-xs text-gray-400 mb-1">Tipo</span>
+                    <select v-model="f.tipo" aria-label="Tipo de variable"
+                      class="w-full bg-dark-700 border border-gray-700 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-discord outline-none">
+                      <option value="texto">Texto</option>
+                      <option value="array">Array (un valor por línea)</option>
+                    </select>
+                  </label>
+                </div>
+                <label class="block">
+                  <span class="block text-xs text-gray-400 mb-1">Descripción</span>
+                  <input v-model="f.descripcion" aria-label="Descripción de la variable" placeholder="Para qué se usa"
+                    class="w-full bg-dark-700 border border-gray-700 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-discord outline-none">
+                </label>
+
+                <div v-if="f.tipo === 'array'">
+                  <label class="block text-xs text-gray-400 mb-1">Valores (uno por línea, pueden llevar variables)</label>
+                  <textarea :value="f._arrayTexto" @input="onEditorInput($event, f, '_arrayTexto')" @keydown="onEditorKeydown" @blur="cerrarAutocompletado"
+                    rows="4" aria-label="Valores del array" placeholder="Hola {user.name}&#10;Bienvenido"
+                    class="w-full bg-dark-700 border border-gray-700 rounded-xl px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-discord outline-none resize-none"></textarea>
+                  <p class="text-[11px] text-gray-500 mt-1">Usalo con <code class="text-discord">{aleatorio(valores:"{...}")}</code> para elegir uno al azar.</p>
+                </div>
+                <div v-else>
+                  <label class="block text-xs text-gray-400 mb-1">Valor (acepta variables y funciones)</label>
+                  <textarea :value="f.valor" @input="onEditorInput($event, f, 'valor')" @keydown="onEditorKeydown" @blur="cerrarAutocompletado"
+                    rows="3" aria-label="Valor de la variable" placeholder="https://ejemplo.com/reglas"
+                    class="w-full bg-dark-700 border border-gray-700 rounded-xl px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-discord outline-none resize-none"></textarea>
+                </div>
+
+                <div class="bg-dark-700 rounded-xl p-3 space-y-3">
+                  <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                    <input type="checkbox" v-model="f.global" class="rounded"> Disponible en todos los servidores
+                  </label>
+                  <div v-if="!f.global">
+                    <p class="text-xs text-gray-500 mb-2">Servidores donde se puede usar:</p>
+                    <div class="flex flex-wrap gap-2">
+                      <label v-for="g in guilds" :key="g.id" class="flex items-center gap-1.5 bg-dark-600 rounded-lg px-2 py-1 text-xs cursor-pointer">
+                        <input type="checkbox" :checked="(f.servidores || []).includes(g.id)" @change="alternarServidor(f, g.id)" class="rounded">
+                        {{ g.name }}
+                      </label>
+                      <p v-if="!guilds.length" class="text-xs text-gray-500">No hay servidores cargados.</p>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="flex items-center justify-between mb-2">
+                      <p class="text-xs text-gray-400">Valores por servidor (opcional)</p>
+                      <button @click="agregarOverride(f)" class="text-xs text-discord hover:text-white">+ Excepción</button>
+                    </div>
+                    <div v-for="(o, oi) in f._overrides" :key="oi" class="bg-dark-600 rounded-lg p-2 mb-2 space-y-2">
+                      <div class="flex gap-2 items-center">
+                        <input v-model="o.id" list="idsServidores" aria-label="ID del servidor" placeholder="ID del servidor"
+                          class="flex-1 bg-dark-700 border border-gray-700 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-discord outline-none">
+                        <button @click="f._overrides.splice(oi, 1)" class="text-gray-500 hover:text-accent-red px-1" :aria-label="'Quitar excepción ' + (oi + 1)">✕</button>
+                      </div>
+                      <textarea v-if="f.tipo === 'array'" v-model="o.texto" rows="2" aria-label="Valores para este servidor" placeholder="Un valor por línea"
+                        class="w-full bg-dark-700 border border-gray-700 rounded-lg px-2 py-1.5 text-xs font-mono focus:ring-2 focus:ring-discord outline-none resize-none"></textarea>
+                      <input v-else v-model="o.texto" aria-label="Valor para este servidor" placeholder="Valor para este servidor"
+                        class="w-full bg-dark-700 border border-gray-700 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-discord outline-none">
+                    </div>
+                  </div>
+                  <label class="flex items-center gap-2 text-xs text-gray-400 cursor-pointer">
+                    <input type="checkbox" v-model="f.debug" class="rounded"> Mostrar errores de esta variable (debug)
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div v-if="!variablesFiltradas.length" class="bg-card rounded-2xl border border-dashed border-gray-700 p-10 text-center">
+              <p class="text-sm text-gray-400">Todavía no hay variables guardadas.</p>
+              <p class="text-xs text-gray-500 mt-1">Creá una con «+ Variable» y usala en los mensajes con <code class="text-discord">{nombre}</code>.</p>
+            </div>
+          </div>
+
+          <!-- PESTAÑA PLANTILLAS -->
+          <div v-if="variablesTab === 'plantillas' && !cargandoVariables" class="space-y-4">
+            <div v-for="f in plantillasFiltradas" :key="f._ui" class="bg-card rounded-2xl border border-gray-800 overflow-hidden">
+              <div class="flex items-center gap-3 p-4 cursor-pointer hover:bg-card-hover transition-colors"
+                @click="filaAbierta = filaAbierta === f._ui ? '' : f._ui" :aria-expanded="filaAbierta === f._ui">
+                <span class="text-accent-green font-mono text-xs shrink-0">&lt;/&gt;</span>
+                <div class="min-w-0 flex-1">
+                  <p class="font-medium text-sm truncate">{{ f.nombre || 'Sin nombre' }}</p>
+                  <p class="text-xs text-gray-500 truncate">{{ f.descripcion || 'Plantilla reutilizable' }}</p>
+                </div>
+                <span class="text-[10px] px-2 py-1 rounded-lg bg-dark-700 text-gray-400 shrink-0">{{ (f.parametros || []).length }} params</span>
+                <button @click.stop="quitarFila(filasPlantillas, filasPlantillas.indexOf(f))" class="text-gray-500 hover:text-accent-red p-1 shrink-0"
+                  :aria-label="'Eliminar plantilla ' + f.nombre">✕</button>
+              </div>
+
+              <div v-if="filaAbierta === f._ui" class="px-4 pb-5 pt-4 border-t border-gray-800/60 space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label class="block">
+                    <span class="block text-xs text-gray-400 mb-1">Nombre (sin llaves)</span>
+                    <input v-model="f.nombre" aria-label="Nombre de la plantilla" placeholder="bienvenida"
+                      class="w-full bg-dark-700 border border-gray-700 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-discord outline-none">
+                  </label>
+                  <label class="block">
+                    <span class="block text-xs text-gray-400 mb-1">Parámetros (uno por línea)</span>
+                    <textarea v-model="f._paramsTexto" rows="2" aria-label="Parámetros de la plantilla" placeholder="nombre&#10;dato"
+                      class="w-full bg-dark-700 border border-gray-700 rounded-xl px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-discord outline-none resize-none"></textarea>
+                  </label>
+                </div>
+                <label class="block">
+                  <span class="block text-xs text-gray-400 mb-1">Descripción</span>
+                  <input v-model="f.descripcion" aria-label="Descripción de la plantilla" placeholder="Para qué se usa"
+                    class="w-full bg-dark-700 border border-gray-700 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-discord outline-none">
+                </label>
+                <div>
+                  <label class="block text-xs text-gray-400 mb-1">Contenido (acepta variables, otras plantillas y funciones)</label>
+                  <textarea :value="f.contenido" @input="onEditorInput($event, f, 'contenido')" @keydown="onEditorKeydown" @blur="cerrarAutocompletado"
+                    rows="5" aria-label="Contenido de la plantilla" placeholder="Hola {nombre}, te damos la bienvenida a {server}"
+                    class="w-full bg-dark-700 border border-gray-700 rounded-xl px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-discord outline-none resize-none"></textarea>
+                  <p class="text-[11px] text-gray-500 mt-1">Se usa así: <code class="text-discord">{plantilla(id:'{{ f._key }}', nombre:'{user}')}</code></p>
+                </div>
+
+                <div class="bg-dark-700 rounded-xl p-3 space-y-3">
+                  <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                    <input type="checkbox" v-model="f.global" class="rounded"> Disponible en todos los servidores
+                  </label>
+                  <div v-if="!f.global">
+                    <p class="text-xs text-gray-500 mb-2">Servidores donde se puede usar:</p>
+                    <div class="flex flex-wrap gap-2">
+                      <label v-for="g in guilds" :key="g.id" class="flex items-center gap-1.5 bg-dark-600 rounded-lg px-2 py-1 text-xs cursor-pointer">
+                        <input type="checkbox" :checked="(f.servidores || []).includes(g.id)" @change="alternarServidor(f, g.id)" class="rounded">
+                        {{ g.name }}
+                      </label>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="flex items-center justify-between mb-2">
+                      <p class="text-xs text-gray-400">Valores por servidor (opcional)</p>
+                      <button @click="agregarOverride(f)" class="text-xs text-discord hover:text-white">+ Excepción</button>
+                    </div>
+                    <div v-for="(o, oi) in f._overrides" :key="oi" class="bg-dark-600 rounded-lg p-2 mb-2 flex gap-2 items-center">
+                      <input v-model="o.id" list="idsServidores" aria-label="ID del servidor" placeholder="ID del servidor"
+                        class="w-40 bg-dark-700 border border-gray-700 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-discord outline-none">
+                      <input v-model="o.texto" aria-label="Contenido para este servidor" placeholder="Contenido para este servidor"
+                        class="flex-1 bg-dark-700 border border-gray-700 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-discord outline-none">
+                      <button @click="f._overrides.splice(oi, 1)" class="text-gray-500 hover:text-accent-red px-1" :aria-label="'Quitar excepción ' + (oi + 1)">✕</button>
+                    </div>
+                  </div>
+                  <label class="flex items-center gap-2 text-xs text-gray-400 cursor-pointer">
+                    <input type="checkbox" v-model="f.debug" class="rounded"> Mostrar errores de esta plantilla (debug)
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div v-if="!plantillasFiltradas.length" class="bg-card rounded-2xl border border-dashed border-gray-700 p-10 text-center">
+              <p class="text-sm text-gray-400">Todavía no hay plantillas guardadas.</p>
+              <p class="text-xs text-gray-500 mt-1">Creá una con «+ Plantilla» y reutilizala con <code class="text-discord">{plantilla(id:"...")}</code>.</p>
+            </div>
+          </div>
+
+          <!-- PROBAR EXPRESIONES -->
+          <div v-if="variablesTab !== 'guia'" class="bg-card rounded-2xl p-5 border border-gray-800">
+            <h3 class="font-semibold mb-3">Probar una expresión</h3>
+            <div class="flex flex-col sm:flex-row gap-2">
+              <input v-model="pruebaTexto" @keydown.enter="probarTexto" aria-label="Texto de prueba"
+                placeholder='{aleatorio(valores:"{Saludos}")} {user.name}'
+                class="flex-1 bg-dark-700 border border-gray-700 rounded-xl px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-discord outline-none">
+              <button @click="probarTexto" class="px-4 py-2 bg-discord hover:bg-discord-hover text-white rounded-xl text-sm font-medium transition-colors shrink-0">Probar</button>
+            </div>
+            <div v-if="pruebaResultado" class="mt-3 bg-dark-700 rounded-xl px-3 py-2">
+              <p class="text-[11px] text-gray-500 mb-1">Resultado:</p>
+              <p class="text-sm text-accent-green break-words">{{ pruebaResultado }}</p>
+            </div>
+          </div>
+
+          <!-- GUÍA DE SINTAXIS -->
+          <div v-if="variablesTab === 'guia'" class="space-y-6">
+            <div class="bg-card rounded-2xl p-6 border border-gray-800">
+              <h3 class="font-semibold text-lg mb-2">Cómo se escribe</h3>
+              <p class="text-sm text-gray-400 leading-relaxed">
+                Las variables van entre llaves. Podés combinarlas con funciones y plantillas, y anidarlas
+                las veces que haga falta. Escribí <code class="text-discord">{</code> en cualquier campo de
+                mensaje para abrir el autocompletado con todas las opciones disponibles.
+              </p>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-4">
+                <div v-for="forma in guiaSintaxis.formas" :key="forma.sintaxis" class="bg-dark-700 rounded-xl p-3">
+                  <code class="text-xs text-accent-green break-all">{{ forma.sintaxis }}</code>
+                  <p class="text-xs text-gray-500 mt-1">{{ forma.descripcion }}</p>
+                  <button @click="copiarTexto(forma.sintaxis, 'Ejemplo')" class="text-[11px] text-discord hover:text-white mt-2">Copiar</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-card rounded-2xl p-6 border border-gray-800">
+              <h3 class="font-semibold text-lg mb-2">Variables del sistema</h3>
+              <p class="text-xs text-gray-500 mb-4">Son reservadas: ninguna variable ni parámetro propio puede sobrescribirlas.</p>
+              <div v-for="grupo in variablesPorCategoria" :key="grupo.categoria" class="mb-4">
+                <p class="text-xs font-medium text-discord mb-2">{{ grupo.categoria }}</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  <div v-for="v in grupo.vars" :key="v.nombre" class="bg-dark-700 rounded-lg px-3 py-2">
+                    <code class="text-xs text-discord">{{ '{' + v.nombre + '}' }}</code>
+                    <p class="text-xs text-gray-500">{{ v.descripcion }}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-card rounded-2xl p-6 border border-gray-800">
+              <h3 class="font-semibold text-lg mb-4">Funciones</h3>
+              <div class="space-y-3">
+                <div v-for="fn in guiaSintaxis.funciones" :key="fn.nombre" class="bg-dark-700 rounded-xl p-4">
+                  <div class="flex items-center justify-between gap-3">
+                    <code class="text-sm text-accent-green">{{ fn.nombre }}()</code>
+                    <button @click="copiarTexto(fn.ejemplo, 'Ejemplo')" class="text-xs text-discord hover:text-white shrink-0">Copiar ejemplo</button>
+                  </div>
+                  <p class="text-xs text-gray-400 mt-1">{{ fn.descripcion }}</p>
+                  <p class="text-[11px] text-gray-500 mt-2">Argumentos: {{ fn.argumentos.join(', ') }}</p>
+                  <code class="block text-[11px] text-gray-300 bg-dark-900 rounded-lg px-2 py-1.5 mt-2 break-all">{{ fn.ejemplo }}</code>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-card rounded-2xl p-5 border border-gray-800 text-xs text-gray-500 leading-relaxed space-y-1">
+              <p><strong class="text-gray-300">Errores:</strong> se ocultan por default. Para ver qué falló, activá el debug en la variable, la plantilla o en la prueba.</p>
+              <p><strong class="text-gray-300">Llaves literales:</strong> escribí <code class="text-discord">\{user\}</code> para mostrar <code>{user}</code> sin que se reemplace.</p>
+              <p><strong class="text-gray-300">Arrays:</strong> guadalos como variable tipo array y usalos con <code class="text-discord">aleatorio</code>; <code>rango:"1,5"</code> toma los primeros 5 valores.</p>
+            </div>
+          </div>
+        </div>
+
         <!-- SETTINGS -->
         <div v-if="currentPage === 'settings'" class="max-w-3xl space-y-6">
           <div class="bg-card rounded-2xl p-6 border border-gray-800">
@@ -1717,7 +1995,27 @@
         </div>
       </div>
     </main>
+
+    <!-- Autocompletado flotante: aparece sobre el campo que se está editando -->
+    <div v-if="autoActivo && sugerencias.length" :style="autoEstilo" role="listbox" aria-label="Sugerencias de sintaxis"
+      class="bg-dark-800 border border-discord/40 rounded-xl shadow-2xl overflow-hidden">
+      <div class="px-3 py-1.5 text-[10px] text-gray-500 border-b border-gray-800">
+        Sugerencias · ↑↓ navegar · Enter elegir · Esc cerrar
+      </div>
+      <button v-for="(s, i) in sugerencias" :key="s.categoria + '_' + s.clave" @mousedown.prevent="aceptarSugerencia(s)"
+        role="option" :aria-selected="i === sugerenciaIndice"
+        :class="i === sugerenciaIndice ? 'bg-discord/20' : 'hover:bg-dark-700'"
+        class="w-full flex items-start gap-2 px-3 py-2 text-left transition-colors">
+        <span class="text-[10px] px-1.5 py-0.5 rounded shrink-0"
+          :class="s.tipo === 'funcion' ? 'bg-accent-green/15 text-accent-green' : s.tipo === 'plantilla' ? 'bg-accent-pink/15 text-accent-pink' : 'bg-discord/15 text-discord'">{{ s.categoria }}</span>
+        <span class="min-w-0">
+          <code class="block text-xs text-gray-100 truncate">{{ s.etiqueta }}</code>
+          <span class="block text-[11px] text-gray-500 truncate">{{ s.descripcion }}</span>
+        </span>
+      </button>
+    </div>
   </div>
+  <script src="editorLogic.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

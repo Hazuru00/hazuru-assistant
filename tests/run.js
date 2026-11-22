@@ -818,6 +818,72 @@ prueba('validación de la biblioteca: reservados, duplicados y tamaños', () => 
   assert(VARIABLES_SISTEMA_INFO.some((v) => v.categoria === 'Moderación'), 'guía trae moderator/reason');
 });
 
+prueba('autocompletado: detección del token y reglas de edición', () => {
+  const { detectarToken } = require(ruta('frontend/editorLogic.js'));
+
+  const token = detectarToken('Hola {us', 8);
+  assert(token && token.inicio === 5 && token.fin === 8 && token.trozo === 'us');
+  assert.strictEqual(detectarToken('Hola {user').trozo, 'user', 'cursor al final por defecto');
+
+  // Reemplaza la expresión completa aunque el cursor esté en medio.
+  const medio = 'Hola {user.name}!';
+  const tokenMedio = detectarToken(medio, 9);
+  assert.strictEqual(medio.slice(tokenMedio.inicio, tokenMedio.fin), '{user.name}');
+
+  // No se abre si la llave está escapada, cerrada o ya hay argumentos.
+  assert.strictEqual(detectarToken('\\{user'), null, 'llave escapada');
+  assert.strictEqual(detectarToken('Hola {user}'), null, 'expresión cerrada');
+  assert.strictEqual(detectarToken('{mayusculas(texto:"a'), null, 'dentro de argumentos');
+  assert.strictEqual(detectarToken('{\n'), null, 'salto de línea');
+});
+
+prueba('autocompletado: catálogo, filtrado e inserción con cursor', () => {
+  const logica = require(ruta('frontend/editorLogic.js'));
+  const { resolverPlantillas } = require(ruta('src/utils/templateEngine.js'));
+
+  const guia = {
+    variables: [{ nombre: 'memberCount', descripcion: 'Miembros', categoria: 'Servidor' }],
+    funciones: [{
+      nombre: 'aleatorio', argumentos: ['valores', 'rango'],
+      descripcion: 'Azar', ejemplo: '{aleatorio(valores:"{Saludos}")}',
+    }],
+  };
+  const biblioteca = {
+    variables: { v1: { id: 'v1', nombre: 'Saludos', tipo: 'array', descripcion: 'Frases' } },
+    plantillas: { p1: { id: 'p1', nombre: 'bienvenida', parametros: ['nombre'], descripcion: 'Da la bienvenida' } },
+  };
+  const catalogo = logica.construirCatalogo(guia, biblioteca);
+
+  assert(catalogo.some((i) => i.clave === 'memberCount' && i.tipo === 'variable'));
+  assert(catalogo.some((i) => i.clave === 'aleatorio' && i.tipo === 'funcion'));
+  assert(catalogo.some((i) => i.clave === 'Saludos' && i.categoria === 'Array custom'));
+  assert(catalogo.find((i) => i.tipo === 'plantilla').texto.includes('{plantilla(id:"p1", nombre:"")}'));
+
+  // La búsqueda ignora acentos y mayúsculas.
+  assert.strictEqual(logica.filtrarCatalogo(catalogo, 'SALUDOS')[0].clave, 'Saludos');
+  assert.strictEqual(logica.filtrarCatalogo(catalogo, 'bienv')[0].clave, 'bienvenida');
+  assert.strictEqual(logica.filtrarCatalogo(catalogo, 'zzz').length, 0);
+
+  // Las funciones se insertan con argumentos nombrados y el cursor en el primer valor.
+  const insercion = logica.textoDeSugerencia(catalogo.find((i) => i.clave === 'aleatorio'));
+  assert.strictEqual(insercion.texto, '{aleatorio(valores:"", rango:"")}');
+  assert.strictEqual(insercion.texto[insercion.cursor - 1], '"', 'cursor entre las comillas');
+  assert.strictEqual(insercion.texto[insercion.cursor], '"', 'cursor entre las comillas');
+  assert.strictEqual(logica.textoDeSugerencia({ tipo: 'variable', texto: '{Saludos}' }).cursor, 9);
+
+  // Flujo completo: escribir `{ale` y aceptar deja el esqueleto listo para editar.
+  const texto = 'Elige {ale';
+  const token = logica.detectarToken(texto, texto.length);
+  assert.strictEqual(logica.filtrarCatalogo(catalogo, token.trozo)[0].clave, 'aleatorio');
+  const nuevo = texto.slice(0, token.inicio) + insercion.texto + texto.slice(token.fin);
+  assert.strictEqual(nuevo, 'Elige {aleatorio(valores:"", rango:"")}');
+  const pos = token.inicio + insercion.cursor;
+  assert.strictEqual(nuevo[pos - 1], '"', 'cursor final entre las comillas');
+  assert.strictEqual(nuevo[pos], '"', 'cursor final entre las comillas');
+  // El esqueleto insertado es válido para el motor aunque aún esté vacío.
+  assert.strictEqual(resolverPlantillas(insercion.texto, {}), '');
+});
+
 // ---------------------------------------------------------------------------
 // Ejecución
 // ---------------------------------------------------------------------------

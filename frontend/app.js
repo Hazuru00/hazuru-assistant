@@ -1,4 +1,4 @@
-const { createApp, ref, computed, onMounted, watch } = Vue;
+const { createApp, ref, computed, onMounted, watch, nextTick } = Vue;
 
 createApp({
   setup() {
@@ -129,6 +129,7 @@ createApp({
       { id: 'levels', label: 'Niveles', icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>' },
       { id: 'automod', label: 'Auto-Moderación', icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>' },
       { id: 'logging', label: 'Logging', icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>' },
+      { id: 'variables', label: 'Variables y Plantillas', icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7h16M4 12h10m-10 5h16M14 12l2 2 4-4"></path></svg>' },
       { id: 'commands', label: 'Comandos', icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>' },
       { id: 'settings', label: 'Ajustes', icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>' },
     ];
@@ -355,12 +356,12 @@ createApp({
     };
 
     const currentPageTitle = computed(() => {
-      const t = { home: 'Inicio', welcome: 'Bienvenidas', farewell: 'Despedidas', private: 'DM Bienvenida', boost: 'Boost', ban: 'Bans', kick: 'Kicks', autorole: 'Auto-Role', automod: 'Auto-Moderación', logging: 'Logging', commands: 'Comandos', settings: 'Ajustes', levels: 'Niveles' };
+      const t = { home: 'Inicio', welcome: 'Bienvenidas', farewell: 'Despedidas', private: 'DM Bienvenida', boost: 'Boost', ban: 'Bans', kick: 'Kicks', autorole: 'Auto-Role', automod: 'Auto-Moderación', logging: 'Logging', variables: 'Variables y Plantillas', commands: 'Comandos', settings: 'Ajustes', levels: 'Niveles' };
       return t[currentPage.value] || 'Inicio';
     });
 
     const currentPageDesc = computed(() => {
-      const d = { home: 'Panel de control', welcome: 'Mensajes de bienvenida', farewell: 'Mensajes de despedida', private: 'DM de bienvenida', boost: 'Mensajes de boost', ban: 'Mensajes de ban', kick: 'Mensajes de kick', autorole: 'Rol automatico al unirse', automod: 'Filtros automaticos del chat', logging: 'Registro de eventos del servidor', commands: 'Comandos del bot', settings: 'Personaliza el dashboard', levels: 'Sistema de niveles y XP' };
+      const d = { home: 'Panel de control', welcome: 'Mensajes de bienvenida', farewell: 'Mensajes de despedida', private: 'DM de bienvenida', boost: 'Mensajes de boost', ban: 'Mensajes de ban', kick: 'Mensajes de kick', autorole: 'Rol automatico al unirse', automod: 'Filtros automaticos del chat', logging: 'Registro de eventos del servidor', variables: 'Textos reutilizables y guía de sintaxis', commands: 'Comandos del bot', settings: 'Personaliza el dashboard', levels: 'Sistema de niveles y XP' };
       return d[currentPage.value] || '';
     });
 
@@ -401,6 +402,324 @@ createApp({
     const copyVar = (v) => {
       navigator.clipboard?.writeText(v);
       showToast('success', `Variable ${v} copiada`);
+    };
+
+    const copiarTexto = (texto, etiqueta = 'Texto') => {
+      navigator.clipboard?.writeText(texto);
+      showToast('success', `${etiqueta} copiado`);
+    };
+
+    // -----------------------------------------------------------------------
+    // BIBLIOTECA DE VARIABLES, PLANTILLAS Y GUÍA DE SINTAXIS
+    // La biblioteca es global por despliegue: se guarda con un PUT completo.
+    // -----------------------------------------------------------------------
+    const biblioteca = ref({ variables: {}, plantillas: {} });
+    const guiaSintaxis = ref({ variables: [], funciones: [], formas: [] });
+    const cargandoVariables = ref(false);
+    const guardandoVariables = ref(false);
+    const variablesTab = ref('variables');
+    const filtroVariables = ref('');
+    const filasVariables = ref([]);
+    const filasPlantillas = ref([]);
+    const filaAbierta = ref('');
+    const idInterfaz = () => `ui_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+    const pruebaTexto = ref('Hola {user.name}, {miVariable}');
+    const pruebaResultado = ref('');
+
+    const filaVariableNueva = () => ({
+      _ui: idInterfaz(),
+      _key: '', nombre: '', descripcion: '', tipo: 'texto', valor: '',
+      global: true, servidores: [], debug: false,
+      _arrayTexto: '', _overrides: [],
+    });
+    const filaPlantillaNueva = () => ({
+      _ui: idInterfaz(),
+      _key: '', nombre: '', descripcion: '', contenido: '',
+      parametros: [], global: true, servidores: [], debug: false,
+      _paramsTexto: '', _overrides: [],
+    });
+
+    // Convierte `valoresPorServidor` (objeto) en filas editables (array).
+    const overridesARows = (valores = {}) => Object.entries(valores).map(([id, valor]) => ({
+      id,
+      texto: Array.isArray(valor) ? valor.join('\n') : String(valor ?? ''),
+    }));
+
+    const aplicarBiblioteca = (datos) => {
+      biblioteca.value = datos || { variables: {}, plantillas: {} };
+      filasVariables.value = Object.values(biblioteca.value.variables || {}).map((v) => ({
+        ...v,
+        _ui: idInterfaz(),
+        _key: v.id,
+        _arrayTexto: Array.isArray(v.valor) ? v.valor.join('\n') : '',
+        _overrides: overridesARows(v.valoresPorServidor),
+      }));
+      filasPlantillas.value = Object.values(biblioteca.value.plantillas || {}).map((p) => ({
+        ...p,
+        _ui: idInterfaz(),
+        _key: p.id,
+        _paramsTexto: (p.parametros || []).join('\n'),
+        _overrides: overridesARows(p.valoresPorServidor),
+      }));
+    };
+
+    const cargarVariables = async () => {
+      cargandoVariables.value = true;
+      try {
+        const resp = await fetch('/api/message-variables');
+        if (!resp.ok) throw new Error('No se pudo cargar la biblioteca');
+        const datos = await resp.json();
+        guiaSintaxis.value = datos.guia || guiaSintaxis.value;
+        aplicarBiblioteca(datos.biblioteca);
+      } catch (e) {
+        showToast('error', e.message);
+      } finally {
+        cargandoVariables.value = false;
+      }
+    };
+
+    const overridesDeFila = (fila) => {
+      const salida = {};
+      for (const filaOverride of fila._overrides || []) {
+        const id = String(filaOverride.id || '').trim();
+        const texto = String(filaOverride.texto || '');
+        if (!id || !texto.trim()) continue;
+        salida[id] = fila.tipo === 'array'
+          ? texto.split('\n').map((x) => x.trim()).filter(Boolean)
+          : texto;
+      }
+      return salida;
+    };
+
+    const guardarVariables = async () => {
+      guardandoVariables.value = true;
+      try {
+        const payload = { variables: {}, plantillas: {} };
+        filasVariables.value.forEach((f, i) => {
+          const valor = f.tipo === 'array'
+            ? (f._arrayTexto || '').split('\n').map((x) => x.trim()).filter(Boolean)
+            : String(f.valor || '');
+          payload.variables[f._key || `nueva_${i}`] = {
+            id: f._key || undefined,
+            nombre: f.nombre,
+            descripcion: f.descripcion,
+            tipo: f.tipo,
+            valor,
+            global: !!f.global,
+            servidores: f.servidores || [],
+            valoresPorServidor: overridesDeFila(f),
+            debug: !!f.debug,
+          };
+        });
+        filasPlantillas.value.forEach((p, i) => {
+          payload.plantillas[p._key || `nueva_${i}`] = {
+            id: p._key || undefined,
+            nombre: p.nombre,
+            descripcion: p.descripcion,
+            contenido: String(p.contenido || ''),
+            parametros: (p._paramsTexto || '').split('\n').map((x) => x.trim()).filter(Boolean),
+            global: !!p.global,
+            servidores: p.servidores || [],
+            valoresPorServidor: overridesDeFila(p),
+            debug: !!p.debug,
+          };
+        });
+        const resp = await fetch('/api/message-variables', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const datos = await resp.json();
+        if (!resp.ok) throw new Error(datos.error || 'No se pudo guardar');
+        aplicarBiblioteca(datos);
+        showToast('success', 'Biblioteca guardada');
+      } catch (e) {
+        showToast('error', e.message);
+      } finally {
+        guardandoVariables.value = false;
+      }
+    };
+
+    const agregarVariable = () => {
+      const fila = filaVariableNueva();
+      filasVariables.value.push(fila);
+      filaAbierta.value = fila._ui;
+      variablesTab.value = 'variables';
+    };
+
+    const agregarPlantilla = () => {
+      const fila = filaPlantillaNueva();
+      filasPlantillas.value.push(fila);
+      filaAbierta.value = fila._ui;
+      variablesTab.value = 'plantillas';
+    };
+
+    const quitarFila = (lista, idx) => {
+      lista.splice(idx, 1);
+      filaAbierta.value = '';
+    };
+
+    const agregarOverride = (fila) => {
+      fila._overrides = fila._overrides || [];
+      fila._overrides.push({ id: '', texto: '' });
+    };
+
+    const alternarServidor = (fila, id) => {
+      fila.servidores = fila.servidores || [];
+      const i = fila.servidores.indexOf(id);
+      if (i >= 0) fila.servidores.splice(i, 1);
+      else fila.servidores.push(id);
+    };
+
+    const variablesPorCategoria = computed(() => {
+      const agrupadas = {};
+      for (const v of guiaSintaxis.value.variables || []) {
+        const categoria = v.categoria || 'General';
+        if (!agrupadas[categoria]) agrupadas[categoria] = [];
+        agrupadas[categoria].push(v);
+      }
+      return Object.entries(agrupadas).map(([categoria, vars]) => ({ categoria, vars }));
+    });
+
+    const editorLogic = window.LogicaEditor;
+    const normalizarBusqueda = editorLogic.normalizar;
+
+    const variablesFiltradas = computed(() => filasVariables.value.filter((f) =>
+      normalizarBusqueda(`${f.nombre} ${f.descripcion}`).includes(normalizarBusqueda(filtroVariables.value))));
+    const plantillasFiltradas = computed(() => filasPlantillas.value.filter((f) =>
+      normalizarBusqueda(`${f.nombre} ${f.descripcion}`).includes(normalizarBusqueda(filtroVariables.value))));
+
+    // La referencia de los editores incluye también las variables guardadas.
+    const variablesReferencia = computed(() => [
+      ...availableVars.map((v) => ({ value: v.value, desc: v.desc })),
+      ...Object.values(biblioteca.value.variables || {}).map((v) => ({
+        value: `{${v.nombre}}`,
+        desc: v.descripcion || (v.tipo === 'array' ? 'Array (úsalo con aleatorio)' : 'Variable personalizada'),
+      })),
+    ]);
+
+    const probarTexto = async () => {
+      try {
+        const fuente = {
+          user: '<@123456789>', 'user.name': 'Ana', 'user.id': '123456789',
+          'user.tag': 'Ana#0001', server: 'Servidor de prueba', 'server.id': '987654321',
+          memberCount: 147, boost: 3, moderator: '<@111>', reason: 'prueba',
+        };
+        const resp = await fetch('/api/message-variables/preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            texto: pruebaTexto.value,
+            fuente,
+            guildId: selectedGuild.value?.id || '',
+          }),
+        });
+        const datos = await resp.json();
+        if (!resp.ok) throw new Error(datos.error || 'No se pudo probar');
+        pruebaResultado.value = datos.resultado;
+      } catch (e) {
+        showToast('error', e.message);
+      }
+    };
+
+    const abrirGuia = () => {
+      currentPage.value = 'variables';
+      variablesTab.value = 'guia';
+      cerrarSidebar();
+    };
+
+    // -----------------------------------------------------------------------
+    // AUTOCOMPLETADO: se activa al escribir `{` en cualquier campo de texto.
+    // Ofrece variables del sistema, variables/arrays guardados, funciones y
+    // plantillas. Las funciones se insertan con sus argumentos nombrados.
+    // -----------------------------------------------------------------------
+    const catalogo = computed(() => editorLogic.construirCatalogo(
+      guiaSintaxis.value, biblioteca.value,
+    ));
+
+    const sugerencias = ref([]);
+    const sugerenciaIndice = ref(0);
+    const autoActivo = ref(false);
+    const autoEstilo = ref({});
+    // El elemento y el objeto se guardan fuera de la reactividad: Vue no debe
+    // intentar hacer proxy de un nodo del DOM.
+    let autoEl = null;
+    let autoObj = null;
+    let autoKey = '';
+    let autoInicio = 0;
+    let autoFin = 0;
+
+    const cerrarAutocompletado = () => {
+      autoActivo.value = false;
+      sugerencias.value = [];
+      autoEl = null;
+      autoObj = null;
+      autoKey = '';
+    };
+
+    const actualizarSugerencias = (el, obj, key) => {
+      if (!el || typeof el.selectionStart !== 'number') return cerrarAutocompletado();
+      const token = editorLogic.detectarToken(el.value, el.selectionStart);
+      if (!token) return cerrarAutocompletado();
+      autoInicio = token.inicio;
+      autoFin = token.fin;
+      autoEl = el;
+      autoObj = obj;
+      autoKey = key;
+
+      sugerencias.value = editorLogic.filtrarCatalogo(catalogo.value, token.trozo);
+      if (!sugerencias.value.length) return cerrarAutocompletado();
+      sugerenciaIndice.value = 0;
+      autoActivo.value = true;
+
+      const rect = el.getBoundingClientRect();
+      autoEstilo.value = {
+        position: 'fixed',
+        top: `${Math.max(8, Math.min(rect.bottom + 6, window.innerHeight - 300))}px`,
+        left: `${Math.max(8, Math.min(rect.left, window.innerWidth - 380))}px`,
+        width: `${Math.max(280, Math.min(rect.width || 360, 440))}px`,
+        zIndex: '80',
+      };
+    };
+
+    const onEditorInput = (e, obj, key) => {
+      const el = e.target;
+      if (obj && key) obj[key] = el.value;
+      actualizarSugerencias(el, obj, key);
+    };
+
+    const textoDeSugerencia = editorLogic.textoDeSugerencia;
+
+    const aceptarSugerencia = (item) => {
+      if (!autoEl || !item) return;
+      const el = autoEl;
+      const { texto, cursor } = textoDeSugerencia(item);
+      const nuevo = el.value.slice(0, autoInicio) + texto + el.value.slice(autoFin);
+      const pos = autoInicio + cursor;
+      if (autoObj && autoKey) autoObj[autoKey] = nuevo;
+      cerrarAutocompletado();
+      nextTick(() => {
+        el.focus();
+        el.setSelectionRange(pos, pos);
+      });
+    };
+
+    const onEditorKeydown = (e) => {
+      if (!autoActivo.value || !sugerencias.value.length) return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        sugerenciaIndice.value = (sugerenciaIndice.value + 1) % sugerencias.value.length;
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        sugerenciaIndice.value = (sugerenciaIndice.value - 1 + sugerencias.value.length) % sugerencias.value.length;
+      } else if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        aceptarSugerencia(sugerencias.value[sugerenciaIndice.value]);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        cerrarAutocompletado();
+      }
     };
 
     const showToast = (type, message) => {
@@ -1130,12 +1449,15 @@ createApp({
       loadAuthorizedServers();
       loadFonts();
       loadCardAnimations();
+      cargarVariables();
       socket.on('status', (data) => { status.value = data.status; });
       socket.on('stats', aplicarStats);
       // Escape cierra el menú lateral, igual que en cualquier app nativa.
       document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && sidebarOpen.value) sidebarOpen.value = false;
       });
+      // Al desplazarse el panel flotante quedaría desalineado: se cierra.
+      window.addEventListener('scroll', cerrarAutocompletado, true);
       loadGuilds();
     });
 
@@ -1165,6 +1487,14 @@ createApp({
       getAnimPhase, openAnimEditor, onAnimPhaseChange, addKeyframe, removeKeyframe,
       saveCardAnimation, deleteCardAnim, previewAnimDraft, previewAnimDebounced, regeneratePreview,
       setAutoPlayPreview, jumpToFrame, applySavedAnimation,
+      copiarTexto, biblioteca, guiaSintaxis, cargandoVariables, guardandoVariables,
+      variablesTab, filtroVariables, filasVariables, filasPlantillas, filaAbierta,
+      variablesFiltradas, plantillasFiltradas, variablesReferencia, variablesPorCategoria,
+      pruebaTexto, pruebaResultado,
+      cargarVariables, guardarVariables, agregarVariable, agregarPlantilla,
+      quitarFila, agregarOverride, alternarServidor, probarTexto, abrirGuia,
+      catalogo, sugerencias, sugerenciaIndice, autoActivo, autoEstilo,
+      onEditorInput, onEditorKeydown, aceptarSugerencia, cerrarAutocompletado,
     };
   }
 }).mount('#app');
