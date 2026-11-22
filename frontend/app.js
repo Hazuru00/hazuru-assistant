@@ -969,6 +969,22 @@ createApp({
       if (levelsConfig.value.enabled) loadLevelsLeaderboard();
     };
 
+    // Pinta las tres tarjetas superiores con los datos que llegan del bot.
+    const aplicarStats = (data) => {
+      if (data.status) status.value = data.status;
+      if (data.guilds !== undefined) stats.value[0].value = data.guilds;
+      if (data.users !== undefined) stats.value[1].value = data.users;
+      if (data.uptime !== undefined) stats.value[2].value = formatUptime(data.uptime);
+    };
+
+    // Consulta inicial por si Socket.IO tarda en conectar o no está disponible.
+    const loadStatus = async () => {
+      try {
+        const res = await fetch('/api/status');
+        if (res.ok) aplicarStats(await res.json());
+      } catch {}
+    };
+
     const loadGuilds = async () => {
       loadingGuilds.value = true;
       try {
@@ -1094,17 +1110,14 @@ createApp({
     });
 
     onMounted(() => {
+      loadStatus();
       loadCommands();
       loadDashboardConfig();
       loadAuthorizedServers();
       loadFonts();
       loadCardAnimations();
       socket.on('status', (data) => { status.value = data.status; });
-      socket.on('stats', (data) => {
-        stats.value[0].value = data.guilds;
-        stats.value[1].value = data.users;
-        stats.value[2].value = formatUptime(data.uptime);
-      });
+      socket.on('stats', aplicarStats);
       // Escape cierra el menú lateral, igual que en cualquier app nativa.
       document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && sidebarOpen.value) sidebarOpen.value = false;

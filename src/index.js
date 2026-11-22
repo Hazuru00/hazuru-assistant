@@ -415,14 +415,20 @@ app.post('/api/guilds/:id/preview/:type', async (req, res) => {
 
 
 // --- ESTADO DEL BOT ---
+// Devuelve el estado real del bot.
+// "users" es la suma de miembros de todos los servidores: usar
+// client.users.cache.size daba un número incompleto que crecía recién cuando
+// se abría un servidor y se consultaba /members.
+const obtenerStats = () => ({
+  status: client.isReady() ? 'online' : 'offline',
+  guilds: client.guilds.cache.size,
+  users: client.guilds.cache.reduce((total, guild) => total + guild.memberCount, 0),
+  uptime: client.uptime,
+});
+
 // GET /api/status → Devuelve si el bot está online, cuántos servidores, usuarios, uptime
 app.get('/api/status', (req, res) => {
-  res.json({
-    status: client.isReady() ? 'online' : 'offline',
-    guilds: client.guilds.cache.size,
-    users: client.users.cache.size,
-    uptime: client.uptime,
-  });
+  res.json(obtenerStats());
 });
 
 
@@ -870,17 +876,17 @@ app.put('/api/dashboard-config', (req, res) => {
  */
 io.on('connection', (socket) => {
   console.log('Frontend connected');
-  socket.emit('status', { status: client.isReady() ? 'online' : 'offline' });
+  // Enviar el estado completo de una vez: así el dashboard no arranca con
+  // ceros ni con datos viejos esperando al primer intervalo de 5 segundos.
+  const stats = obtenerStats();
+  socket.emit('status', { status: stats.status });
+  socket.emit('stats', stats);
 });
 
 // Enviar stats cada 5 segundos a todos los frontends conectados
 setInterval(() => {
   if (client.isReady()) {
-    io.emit('stats', {
-      guilds: client.guilds.cache.size,
-      users: client.users.cache.size,
-      uptime: client.uptime,
-    });
+    io.emit('stats', obtenerStats());
   }
 }, 5000);
 
