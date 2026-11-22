@@ -13,6 +13,7 @@ src/database/reminders.json
 src/database/levels.json
 src/database/settings.json
 src/database/cardAnimations.json
+src/database/messageVariables.json
 src/database/*.tmp
 src/database/*.corrupt-*
 backups/

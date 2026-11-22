@@ -36,6 +36,8 @@ const path = require('path');
 const fs = require('fs');
 const { getElementState, NEUTRAL } = require('./textAnimations');
 const { listCardAnimations } = require('../database/cardAnimations');
+const { getBiblioteca } = require('../database/messageVariables');
+const { resolverPlantillas } = require('./templateEngine');
 
 /** Convierte la lista de animaciones guardadas en el mapa por ID que espera el motor.*/
 function listCardAnimationsAsMap() {
@@ -274,17 +276,13 @@ function replaceCardVars(text, member) {
     boost: String(guild.premiumSubscriptionCount || 0),
   };
 
-  let result = text;
-  for (const [key, value] of Object.entries(vars)) {
-    result = result.replace(new RegExp(`\\{${key.replace(/\./g, '\\.')}}`, 'g'), String(value));
-  }
-
-  const now = new Date();
-  const pad = (n) => String(n).padStart(2, '0');
-  result = result.replace(/\{date\}/g, `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()}`);
-  result = result.replace(/\{time\}/g, `${pad(now.getHours())}:${pad(now.getMinutes())}`);
-
-  return result;
+  // Se usa el mismo motor que los mensajes, pero con las variables propias de
+  // la tarjeta: {user} es el nombre, no una mención (no se renderiza en imagen).
+  return resolverPlantillas(text, {
+    vars,
+    guildId: guild.id || vars['server.id'] || '',
+    biblioteca: getBiblioteca(),
+  });
 }
 
 /**

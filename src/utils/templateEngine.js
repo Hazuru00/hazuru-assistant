@@ -22,7 +22,7 @@
  * ============================================================================
  */
 
-const { obtenerVarsBase, obtenerVarsFechaHora } = require('./replaceVars');
+const { obtenerVarsBase, obtenerVarsFechaHora } = require('./varsBase');
 
 const MAX_PROFUNDIDAD = 5;
 

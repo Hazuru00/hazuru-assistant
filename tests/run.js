@@ -32,6 +32,14 @@ const simular = (relativa, exports) => {
 
 simular('src/utils/logger.js', { logInfo: () => {}, logError: () => {}, logWarn: () => {} });
 
+// --- Base de variables en memoria: no se escriben JSON reales en los tests ---
+let bibliotecaEnMemoria = { variables: {}, plantillas: {} };
+simular('src/database/backup.js', { createBackup: () => {} });
+simular('src/database/atomic.js', {
+  readJson: (archivo, fallback) => archivo.includes('messageVariables') ? bibliotecaEnMemoria : fallback,
+  writeJsonAtomic: (archivo, datos) => { bibliotecaEnMemoria = datos; },
+});
+
 // --- Datos falsos de recordatorios ---
 const ahora = Date.now();
 const recordatorios = {
@@ -753,6 +761,61 @@ prueba('regresiones de la revisión: reservadas, espacios, compatibilidad y scop
 
   // El nombre 'reason' es reservado aunque la fuente no sea un ban.
   assert(resolverPlantillas('{reason}', { debug: true }).includes('Variable del sistema no disponible'));
+});
+
+prueba('la biblioteca guardada se aplica a mensajes y embeds reales', () => {
+  const { getBiblioteca, guardarBiblioteca } = require(ruta('src/database/messageVariables.js'));
+  const { replaceVars } = require(ruta('src/utils/replaceVars.js'));
+  const { buildEmbed } = require(ruta('src/utils/buildEmbed.js'));
+
+  bibliotecaEnMemoria = { variables: {}, plantillas: {} };
+  const guardado = guardarBiblioteca({
+    variables: {
+      n1: { nombre: 'reglas', descripcion: 'Enlace', valor: 'https://ejemplo', global: true },
+      n2: { nombre: 'Saludos', tipo: 'array', valor: ['Hola {user}', 'Yeee'], global: true, valoresPorServidor: { '123456789012345678': 'Solo aquí' } },
+    },
+    plantillas: {
+      p1: { nombre: 'bienvenida', contenido: '{nombre} -> {reglas}', parametros: ['nombre'], global: true },
+    },
+  });
+  assert(guardado.ok, guardado.error);
+  assert.strictEqual(Object.keys(getBiblioteca().variables).length, 2);
+
+  const fuente = {
+    id: '1',
+    guild: { id: '123456789012345678', name: 'Servidor', memberCount: 5, iconURL: () => '' },
+    user: { username: 'Ana', tag: 'Ana#1', createdTimestamp: 1, displayAvatarURL: () => '' },
+    joinedTimestamp: 1,
+  };
+  assert.strictEqual(replaceVars('Enlace: {reglas}', fuente), 'Enlace: https://ejemplo');
+  assert.strictEqual(replaceVars('{Saludos}', fuente), 'Solo aquí', 'el override por servidor gana');
+  assert.strictEqual(
+    replaceVars('{plantilla(id:"bienvenida", nombre:"{user.name}")}', fuente),
+    'Ana -> https://ejemplo',
+  );
+  assert.strictEqual(buildEmbed({ title: '{reglas}' }, fuente).toJSON().title, 'https://ejemplo');
+});
+
+prueba('validación de la biblioteca: reservados, duplicados y tamaños', () => {
+  const { guardarBiblioteca, validarNombre } = require(ruta('src/database/messageVariables.js'));
+  const { VARIABLES_SISTEMA_INFO } = require(ruta('src/utils/varsBase.js'));
+
+  assert(validarNombre('user'), 'usuario reservado');
+  assert(validarNombre('user.name'), 'variable compuesta reservada');
+  assert(validarNombre('constructor'), 'propiedad del prototipo');
+  assert.strictEqual(validarNombre('saludos123'), null, 'nombre normal aceptado');
+
+  const reservada = guardarBiblioteca({ variables: { x: { nombre: 'server', valor: 'x', global: true } } });
+  assert(!reservada.ok && reservada.error.includes('sistema'));
+  const duplicado = guardarBiblioteca({ variables: {
+    a: { nombre: 'uno', valor: 'x' }, b: { nombre: 'uno', valor: 'y' },
+  } });
+  assert(!duplicado.ok && duplicado.error.includes('duplicado'));
+  const grande = guardarBiblioteca({ variables: { a: { nombre: 'grande', valor: 'x'.repeat(5000) } } });
+  assert(!grande.ok, 'valor demasiado grande');
+
+  assert(VARIABLES_SISTEMA_INFO.some((v) => v.nombre === 'memberCount'), 'guía trae memberCount');
+  assert(VARIABLES_SISTEMA_INFO.some((v) => v.categoria === 'Moderación'), 'guía trae moderator/reason');
 });
 
 // ---------------------------------------------------------------------------

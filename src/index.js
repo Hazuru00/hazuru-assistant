@@ -64,12 +64,15 @@ const {
   listCardAnimations, getCardAnimation,
   createCardAnimation, updateCardAnimation, removeCardAnimation,
 } = require('./database/cardAnimations');
+const { getBiblioteca, guardarBiblioteca } = require('./database/messageVariables');
 
 // Imports de utilidades
 const { logError, logInfo } = require('./utils/logger');
 const { replaceVars } = require('./utils/replaceVars');
 const { buildEmbed } = require('./utils/buildEmbed');
 const { listPresets } = require('./utils/textAnimations');
+const { resolverPlantillas, FUNCIONES_INFO } = require('./utils/templateEngine');
+const { VARIABLES_SISTEMA_INFO } = require('./utils/varsBase');
 
 // Asegurar que existan los directorios de uploads y logs
 const uploadsDir = path.join(__dirname, '..', 'uploads');
@@ -746,6 +749,54 @@ app.delete('/api/card-animations/:id', (req, res) => {
     res.json({ success: true });
   } catch (e) {
     logError(e, { event: 'api/card-animations', action: 'remove' });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// --- VARIABLES Y PLANTILLAS DE MENSAJE (global por despliegue) ---
+// GET /api/message-variables → biblioteca guardada + guía de sintaxis
+app.get('/api/message-variables', (req, res) => {
+  res.json({
+    biblioteca: getBiblioteca(),
+    guia: {
+      variables: VARIABLES_SISTEMA_INFO,
+      funciones: FUNCIONES_INFO,
+      formas: [
+        { sintaxis: '{nombre}', descripcion: 'Variable del sistema o variable custom' },
+        { sintaxis: '{aleatorio(valores:"{MiArray}", rango:"1,5")}', descripcion: 'Elige entre los primeros 5 valores' },
+        { sintaxis: '{plantilla(id:"bienvenida", nombre:"{user}")}', descripcion: 'Inserta una plantilla con parámetros' },
+        { sintaxis: '{si(condicion:"{memberCount} >= 100", verdadero:"Grande", falso:"Pequeño")}', descripcion: 'Elige un texto según una comparación' },
+        { sintaxis: '\\{user\\}', descripcion: 'Escribe {user} literalmente sin resolverlo' },
+      ],
+    },
+  });
+});
+
+// PUT /api/message-variables → valida y guarda la biblioteca completa
+app.put('/api/message-variables', (req, res) => {
+  try {
+    const resultado = guardarBiblioteca(req.body);
+    if (!resultado.ok) return res.status(400).json({ error: resultado.error });
+    logInfo('Biblioteca de variables actualizada', { event: 'api/message-variables', action: 'save' });
+    res.json(resultado.biblioteca);
+  } catch (e) {
+    logError(e, { event: 'api/message-variables', action: 'save' });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/message-variables/preview → prueba un texto sin guardarlo
+app.post('/api/message-variables/preview', (req, res) => {
+  try {
+    const { texto, fuente, guildId, biblioteca } = req.body || {};
+    const resultado = resolverPlantillas(String(texto || ''), {
+      fuente: fuente || {},
+      guildId: guildId || '',
+      biblioteca: biblioteca || getBiblioteca(),
+    });
+    res.json({ resultado });
+  } catch (e) {
+    logError(e, { event: 'api/message-variables', action: 'preview' });
     res.status(500).json({ error: e.message });
   }
 });
