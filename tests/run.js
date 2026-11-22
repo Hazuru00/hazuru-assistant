@@ -474,6 +474,288 @@ prueba('el help sigue incluyendo todas las variantes tras el refactor', async ()
 });
 
 // ---------------------------------------------------------------------------
+// Motor de plantillas: variables custom, arrays, funciones y anidación
+// ---------------------------------------------------------------------------
+prueba('replaceVars mantiene el resultado original sin variables custom', () => {
+  const { replaceVars } = require(ruta('src/utils/replaceVars.js'));
+  const { resolverPlantillas } = require(ruta('src/utils/templateEngine.js'));
+
+  // Miembro falso con los mismos métodos que expone discord.js.
+  const member = {
+    id: '1',
+    user: {
+      username: 'Ana', tag: 'Ana#0001', createdTimestamp: 1700000000000,
+      displayAvatarURL: () => 'https://avatar/1.png',
+    },
+    joinedTimestamp: 1700000100000,
+    guild: { id: 'g1', name: 'Servidor', memberCount: 147, premiumSubscriptionCount: 3, iconURL: () => 'https://icon/g1.png' },
+  };
+
+  for (const texto of [
+    'Hola {user} en {server} ({memberCount})',
+    '{user.name} / {user.id} / {user.avatar} / {user.tag}',
+    '{user.createdAt} - {user.joinedAt} - {boost} - {server.icon}',
+    '{date} {time}',
+  ]) {
+    assert.strictEqual(resolverPlantillas(texto, { fuente: member }), replaceVars(texto, member), texto);
+  }
+
+  // Ban: rama distinta de miembro.
+  const ban = {
+    user: { id: '2', username: 'Beto', tag: 'Beto#0002', displayAvatarURL: () => 'https://avatar/2.png' },
+    guild: { id: 'g1', name: 'Servidor', memberCount: 147 },
+    executor: { id: '3' },
+    reason: 'spam',
+  };
+  assert.strictEqual(
+    resolverPlantillas('{user} baneado por {moderator}: {reason}', { fuente: ban }),
+    replaceVars('{user} baneado por {moderator}: {reason}', ban),
+  );
+});
+
+prueba('variables del sistema nunca son sobrescribibles por variables custom', () => {
+  const { resolverPlantillas } = require(ruta('src/utils/templateEngine.js'));
+  const biblioteca = { variables: {
+    v1: { id: 'v1', nombre: 'user', valor: 'HACK', global: true },
+    v2: { id: 'v2', nombre: 'server', valor: 'HACK', global: true },
+    v3: { id: 'v3', nombre: 'date', valor: 'HACK', global: true },
+  } };
+  const salida = resolverPlantillas('{user} | {server} | {date}', {
+    fuente: { user: '<@1>', server: 'Real' }, biblioteca, guildId: 'g1',
+  });
+  assert(salida.startsWith('<@1> | Real | '), salida);
+  assert(!salida.includes('HACK'), salida);
+});
+
+prueba('scope global con override por servidor', () => {
+  const { resolverPlantillas } = require(ruta('src/utils/templateEngine.js'));
+  const biblioteca = { variables: {
+    v1: { id: 'v1', nombre: 'prefijo', valor: 'GLOBAL', global: true, valoresPorServidor: { g1: 'LOCAL' } },
+    v2: { id: 'v2', nombre: 'soloUno', valor: 'A', servidores: ['g1'] },
+  } };
+  const plantilla = { fuente: {}, biblioteca };
+  assert.strictEqual(resolverPlantillas('{prefijo}', { ...plantilla, guildId: 'g1' }), 'LOCAL');
+  assert.strictEqual(resolverPlantillas('{prefijo}', { ...plantilla, guildId: 'g2' }), 'GLOBAL');
+  assert.strictEqual(resolverPlantillas('{soloUno}', { ...plantilla, guildId: 'g1' }), 'A');
+  assert.strictEqual(resolverPlantillas('{soloUno}', { ...plantilla, guildId: 'g2' }), '');
+});
+
+prueba('arrays guardados, anidación y las cinco funciones', () => {
+  const { resolverPlantillas } = require(ruta('src/utils/templateEngine.js'));
+  const biblioteca = {
+    variables: {
+      v1: { id: 'v1', nombre: 'Saludos', valor: ['Hola {user}', 'Qué tal {user}', 'Bienvenido'], global: true },
+      v2: { id: 'v2', nombre: 'prefijo', valor: 'SRV', global: true },
+    },
+    plantillas: {
+      p1: { id: 'p1', nombre: 'bienvenida', contenido: '{nombre}, {dato}!', parametros: ['nombre', 'dato'], global: true },
+    },
+  };
+  const base = { fuente: { user: '<@1>' }, biblioteca, guildId: 'g1' };
+
+  // Array como tipo propio: se convierte a texto separado por comas.
+  assert.strictEqual(resolverPlantillas('{Saludos}', base), 'Hola <@1>, Qué tal <@1>, Bienvenido');
+  // random inyectado: siempre el primero.
+  assert.strictEqual(resolverPlantillas('{aleatorio(valores:"{Saludos}")}', { ...base, random: () => 0 }), 'Hola <@1>');
+  assert.strictEqual(resolverPlantillas('{aleatorio(valores:"{Saludos}", rango:"1,2")}', { ...base, random: () => 0.9 }), 'Qué tal <@1>');
+  assert.strictEqual(resolverPlantillas('{aleatorio(valores:["A {user}", "B"])}', { ...base, random: () => 0 }), 'A <@1>');
+  // Variable dentro de función, y función dentro de función.
+  assert.strictEqual(resolverPlantillas('{mayusculas(texto:"{prefijo}")}', base), 'SRV');
+  assert.strictEqual(resolverPlantillas('{minusculas(texto:"{mayusculas(texto:"hola")}")}', base), 'hola');
+  // Plantilla con parámetros resueltos en el scope del llamador.
+  assert.strictEqual(
+    resolverPlantillas('{plantilla(id:"bienvenida", nombre:"{user}", dato:"eres genial")}', base),
+    '<@1>, eres genial!',
+  );
+  // Condiciones numéricas y de texto.
+  const si = (condicion) => resolverPlantillas(
+    `{si(condicion:"${condicion}", verdadero:"SI", falso:"NO")}`,
+    { ...base, fuente: { user: '<@1>', memberCount: '147', server: 'Servidor' } },
+  );
+  assert.strictEqual(si('{memberCount} >= 100'), 'SI');
+  assert.strictEqual(si('{memberCount} < 100'), 'NO');
+  assert.strictEqual(si('{server} contiene Serv'), 'SI');
+  assert.strictEqual(si('{server} == Otro'), 'NO');
+});
+
+prueba('errores: visibles solo con debug, ciclos y anidación limitada', () => {
+  const { resolverPlantillas } = require(ruta('src/utils/templateEngine.js'));
+  const biblioteca = {
+    variables: {
+      v1: { id: 'v1', nombre: 'cicloA', valor: '{cicloB}', global: true },
+      v2: { id: 'v2', nombre: 'cicloB', valor: '{cicloA}', global: true },
+      v3: { id: 'v3', nombre: 'debugOn', valor: '{noExiste}', global: true, debug: true },
+      v4: { id: 'v4', nombre: 'fueraDeServidor', valor: 'X', servidores: ['otro'] },
+    },
+    plantillas: {
+      p1: { id: 'p1', nombre: 'recursiva', contenido: '{plantilla(id:"recursiva")}', parametros: [], global: true },
+    },
+  };
+  const base = { fuente: {}, biblioteca, guildId: 'g1' };
+
+  assert.strictEqual(resolverPlantillas('{noExiste}', base), '');
+  assert.strictEqual(resolverPlantillas('{noExiste}', { ...base, debug: true }), '⚠️ Variable no disponible: {noExiste}');
+  assert(resolverPlantillas('{debugOn}', base).includes('⚠️'), 'debug por variable');
+  assert.strictEqual(resolverPlantillas('{fueraDeServidor}', base), '');
+  assert.strictEqual(resolverPlantillas('{fueraDeServidor}', { ...base, debug: true }), '⚠️ Variable no disponible en este servidor: {fueraDeServidor}');
+  assert(resolverPlantillas('{cicloA}', { ...base, debug: true }).includes('Ciclo detectado'));
+  assert(resolverPlantillas('{plantilla(id:"recursiva")}', { ...base, debug: true }).includes('Ciclo detectado'));
+  assert(resolverPlantillas('{nope(texto:"x")}', { ...base, debug: true }).includes('Función desconocida'));
+  assert(resolverPlantillas('{plantilla(id:"bienvenida")}', { ...base, debug: true }).includes('no disponible'));
+  assert(resolverPlantillas('{aleatorio(valores:[])}', { ...base, debug: true }).includes('al menos un valor'));
+  assert(resolverPlantillas('{si(condicion:"mal", verdadero:"SI", falso:"NO")}', { ...base, debug: true }).includes('Condición inválida'));
+});
+
+prueba('parser respeta espacios, comillas, escapes y llaves literales', () => {
+  const { resolverPlantillas, FUNCIONES_INFO, normalizarArray } = require(ruta('src/utils/templateEngine.js'));
+  const base = { fuente: { user: '<@1>' }, biblioteca: { variables: {
+    v1: { id: 'v1', nombre: 'espacios', valor: '  {user}  ', global: true },
+  } }, guildId: 'g1' };
+
+  assert.strictEqual(resolverPlantillas('  {user}  ', base), '  <@1>  ');
+  assert.strictEqual(resolverPlantillas('[{espacios}]', base), '[  <@1>  ]');
+  assert.strictEqual(resolverPlantillas('esto no es variable {', base), 'esto no es variable {');
+  assert.strictEqual(resolverPlantillas('{aleatorio(valores:["lunes", "martes"])}', { ...base, random: () => 0.99 }), 'martes');
+  assert.deepStrictEqual(normalizarArray('a, b\nc'), ['a', 'b', 'c']);
+  assert.deepStrictEqual(normalizarArray('["a", "b"]'), ['a', 'b']);
+  // La guía de sintaxis expone las cinco funciones esperadas.
+  const nombres = FUNCIONES_INFO.map((f) => f.nombre);
+  for (const nombre of ['aleatorio', 'plantilla', 'mayusculas', 'minusculas', 'si']) {
+    assert(nombres.includes(nombre), `falta ${nombre} en la guía`);
+  }
+  assert(FUNCIONES_INFO.every((f) => f.ejemplo && f.descripcion), 'la guía trae ejemplo y descripción');
+});
+
+prueba('casos límite: profundidad, comas, arrays anidados y argumentos faltantes', () => {
+  const { resolverPlantillas } = require(ruta('src/utils/templateEngine.js'));
+  const biblioteca = {
+    variables: {
+      v1: { id: 'v1', nombre: 'profunda', valor: '{n1}', global: true },
+      v2: { id: 'v2', nombre: 'n1', valor: '{n2}', global: true },
+      v3: { id: 'v3', nombre: 'n2', valor: '{n3}', global: true },
+      v4: { id: 'v4', nombre: 'n3', valor: '{n4}', global: true },
+      v5: { id: 'v5', nombre: 'n4', valor: '{n5}', global: true },
+      v6: { id: 'v6', nombre: 'n5', valor: 'FIN', global: true },
+      v7: { id: 'v7', nombre: 'comas', valor: ['Hola, mundo', 'Adiós'], global: true },
+      v8: { id: 'v8', nombre: 'matriz', valor: [['a', 'b'], ['c']], global: true },
+    },
+    plantillas: {
+      p1: { id: 'p1', nombre: 'conArreglo', contenido: '{elem}', parametros: ['elem'], global: true },
+    },
+  };
+  const base = { fuente: { user: '<@1>' }, biblioteca, guildId: 'g1' };
+
+  assert.strictEqual(
+    resolverPlantillas('{aleatorio(valores:["Hola, mundo", "Adiós"])}', { ...base, random: () => 0 }),
+    'Hola, mundo',
+    'la coma dentro de comillas no separa argumentos',
+  );
+  assert.strictEqual(
+    resolverPlantillas('{aleatorio(valores:"{comas}")}', { ...base, random: () => 0 }),
+    'Hola, mundo',
+    'array guardado con comas',
+  );
+  assert.strictEqual(resolverPlantillas('{matriz}', base), 'a, b, c', 'array de arrays se aplana');
+  assert.strictEqual(
+    resolverPlantillas('{plantilla(id:"conArreglo", elem:"{comas}")}', base),
+    'Hola, mundo, Adiós',
+    'array como parámetro de plantilla',
+  );
+  assert.strictEqual(
+    resolverPlantillas('{aleatorio(valores:"{comas}", rango:"1")}', { ...base, random: () => 0.9 }),
+    'Hola, mundo',
+    'rango de un solo número',
+  );
+
+  const si = (condicion) => resolverPlantillas(
+    `{si(condicion:"${condicion}", verdadero:"SI", falso:"NO")}`,
+    { ...base, fuente: { user: '<@1>', memberCount: '147' } },
+  );
+  assert.strictEqual(si('{memberCount} == 147'), 'SI');
+  assert.strictEqual(si('{memberCount} != 147'), 'NO');
+
+  const profunda = resolverPlantillas('{profunda}', { ...base, debug: true });
+  assert(profunda.includes('Anidación máxima'), profunda);
+  const falta = resolverPlantillas('{mayusculas()}', { ...base, debug: true });
+  assert(falta.includes('Falta el argumento'), falta);
+});
+
+prueba('regresiones de la revisión: reservadas, espacios, compatibilidad y scopes', () => {
+  const { resolverPlantillas } = require(ruta('src/utils/templateEngine.js'));
+  const { replaceVars } = require(ruta('src/utils/replaceVars.js'));
+
+  // Un parámetro de plantilla no puede falsificar una mención ni un servidor.
+  const conParametrosReservados = {
+    plantillas: { p: { id: 'p', parametros: ['user', 'server'], contenido: '{user}|{server}', global: true } },
+  };
+  assert.strictEqual(
+    resolverPlantillas('{plantilla(id:"p", user:"FALSO", server:"FALSO")}', {
+      vars: { user: '<@1>', server: 'MiServer' }, biblioteca: conParametrosReservados,
+    }),
+    '<@1>|MiServer',
+  );
+
+  // Los espacios que envuelven una expresión dentro de un argumento se conservan.
+  assert.strictEqual(resolverPlantillas('{mayusculas(texto:"  {user}  ")}', { vars: { user: '<@1>' } }), '  <@1>  ');
+
+  // replaceVars sigue respetando date/time propios de un objeto plano y `$&`.
+  assert.strictEqual(replaceVars('{date}', { date: 'CUSTOM' }), 'CUSTOM');
+  assert(/^CUSTOM \d{2}\/\d{2}\/\d{4}$/.test(replaceVars('{date} {x}', { date: 'CUSTOM', x: '{date}' })), 'fecha original al final');
+  assert.strictEqual(replaceVars('Hola {user}', { user: '$&' }), 'Hola $&');
+  assert(/^\d{2}\/\d{2}\/\d{4}$/.test(replaceVars('{date}', {})), 'date por defecto');
+
+  // Un override por servidor implica disponibilidad aunque no haya `servidores`.
+  assert.strictEqual(resolverPlantillas('{A}', {
+    guildId: 'g1',
+    biblioteca: { variables: { a: { id: 'a', nombre: 'A', valoresPorServidor: { g1: 'SI' } } } },
+  }), 'SI');
+
+  // Definiciones sin `id` no se confunden entre sí como falsos ciclos.
+  assert.strictEqual(resolverPlantillas('{A}', {
+    biblioteca: { variables: {
+      a: { nombre: 'A', valor: '{B}', global: true },
+      b: { nombre: 'B', valor: 'OK', global: true },
+    } },
+  }), 'OK');
+
+  // rango:"1,5" significa "primeros 5", tal como se decidió.
+  assert.strictEqual(resolverPlantillas('{aleatorio(valores:"{vals}", rango:"1,5")}', {
+    biblioteca: { variables: { v: { id: 'v', nombre: 'vals', valor: ['a', 'b', 'c', 'd', 'e', 'f'], global: true } } },
+    random: () => 0.99,
+  }), 'e');
+
+  // Arrays dentro de arrays conservan sus elementos y las comas literales.
+  const conArray = { biblioteca: { variables: {
+    a: { id: 'a', nombre: 'A', valor: ['uno, dos', 'tres'], global: true },
+  } } };
+  assert.strictEqual(resolverPlantillas('{aleatorio(valores:["{A}"])}', { ...conArray, random: () => 0 }), 'uno, dos');
+  assert.strictEqual(resolverPlantillas('{aleatorio(valores:["hola, mundo"])}', { random: () => 0 }), 'hola, mundo');
+
+  // Un apóstrofo no cierra una cadena escrita con comillas simples.
+  assert.strictEqual(resolverPlantillas("{mayusculas(texto:'don't')}", { debug: true }), "DON'T");
+
+  // JSON y llaves escapadas no se borran ni se interpretan como variables.
+  assert.strictEqual(resolverPlantillas('Config: {"user":"ana"}', { debug: true }), 'Config: {"user":"ana"}');
+  assert.strictEqual(resolverPlantillas('\\{user\\}', { vars: { user: 'X' } }), '{user}');
+
+  // Argumentos posicionales siguen funcionando con la validación de requeridos.
+  assert.strictEqual(resolverPlantillas('{aleatorio("a,b")}', { random: () => 0 }), 'a');
+  assert.strictEqual(resolverPlantillas('{mayusculas("hola")}', {}), 'HOLA');
+
+  // Un backslash literal antes de n no se convierte en salto de línea.
+  assert.strictEqual(resolverPlantillas('{mayusculas(texto:"C:\\\\new")}', {}), 'C:\\NEW');
+
+  // El ID de plantilla es obligatorio: no se toma un parámetro como ID.
+  assert(resolverPlantillas('{plantilla(nombre:"p", x:"1")}', { debug: true }).includes('Falta el argumento "id"'));
+
+  // No se accede a propiedades del prototipo al buscar plantillas.
+  assert(resolverPlantillas('{plantilla(id:"constructor")}', { debug: true }).includes('Plantilla no disponible: constructor'));
+
+  // El nombre 'reason' es reservado aunque la fuente no sea un ban.
+  assert(resolverPlantillas('{reason}', { debug: true }).includes('Variable del sistema no disponible'));
+});
+
+// ---------------------------------------------------------------------------
 // Ejecución
 // ---------------------------------------------------------------------------
 (async () => {

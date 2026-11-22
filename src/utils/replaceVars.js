@@ -4,7 +4,7 @@
  * ============================================================================
  *
  * Reemplaza variables como {user}, {server}, {memberCount} etc. en strings.
- * Se usa en bienvenidas, despedidas, boosts, bans, kicks, y previews.
+ * Se usa en bienvenidas, despedidas, boosts, bans, kicks y previews.
  *
  * VARIABLES DISPONIBLES (para miembros):
  *   {user}           → Mención al usuario (<@123>)
@@ -27,32 +27,49 @@
  *   {moderator}      → Mención del moderador que baneó
  *   {reason}         → Razón del ban
  *
- * TIP: Para agregar una nueva variable, agregarla al objeto `vars` dentro
- * de la sección correspondiente (member, ban, o genérica).
+ * También expone `obtenerVarsBase`, `obtenerVarsFechaHora` y `sustituirVars`
+ * para que el motor de plantillas reutilice exactamente las mismas variables.
  * ============================================================================
  */
 
-/**
- * Reemplaza todas las variables en un string con sus valores reales.
- *
- * @param {string} str - El string con variables (ej: "Bienvenido {user}!")
- * @param {Object} source - Fuente de datos (miembro, ban info, o objeto plano)
- * @returns {string} String con todas las variables reemplazadas
- */
-const replaceVars = (str, source) => {
-  if (!str) return '';
+/** Escapa los caracteres especiales de una clave para usarla en una regex. */
+const escaparRegex = (clave) => clave.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-  // Fecha y hora actual para las variables {date} y {time}
+/**
+ * Sustituye variables conocidas en un string. Las que no existen se dejan
+ * intactas. Se usa una función de reemplazo para que `$&` en un valor se
+ * inserte literalmente y no sea interpretado por String.replace.
+ */
+const sustituirVars = (str, vars) => {
+  let resultado = String(str || '');
+  for (const [clave, valor] of Object.entries(vars)) {
+    resultado = resultado.replace(
+      new RegExp(`\\{${escaparRegex(clave)}\\}`, 'g'),
+      () => String(valor),
+    );
+  }
+  return resultado;
+};
+
+/** Fecha y hora actuales, calculadas una sola vez por resolución. */
+const obtenerVarsFechaHora = () => {
   const now = new Date();
   const pad = (n) => n.toString().padStart(2, '0');
-  const dateStr = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()}`;
-  const timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  return {
+    date: `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()}`,
+    time: `${pad(now.getHours())}:${pad(now.getMinutes())}`,
+  };
+};
 
+/**
+ * Construye las variables del sistema a partir de la fuente.
+ * No incluye date/time: se aplican al final para conservar el comportamiento
+ * original con objetos planos que traen su propia `{date}` o `{time}`.
+ */
+const obtenerVarsBase = (source) => {
   let vars = {};
 
-  // --- CASO 1: Info de ban (tiene user, guild, executor) ---
-  // Se usa en: mensaje de ban — DEBE IR ANTES que el caso de miembro
-  // porque los bans también tienen guild y user
+  // Ban: tiene user, guild y executor. Debe evaluarse antes que miembro.
   if (source && source.guild && source.user && source.executor) {
     const ban = source;
     vars = {
@@ -69,8 +86,7 @@ const replaceVars = (str, source) => {
       reason: ban.reason || 'Sin razon',
     };
 
-  // --- CASO 2: Miembro de Discord (tiene guild y user) ---
-  // Se usa en: bienvenida, despedida, boost
+  // Miembro de Discord: bienvenida, despedida, boost.
   } else if (source && source.guild && source.user) {
     const member = source;
     vars = {
@@ -89,25 +105,25 @@ const replaceVars = (str, source) => {
       boost: String(member.guild.premiumSubscriptionCount || 0),
     };
 
-  // --- CASO 3: Objeto plano (key-value personalizado) ---
-  // Se usa en: previews del panel web, API
+  // Objeto plano: usado por previews y API. Se copia para no mutarlo.
   } else if (source) {
-    vars = source;
+    vars = { ...source };
   }
 
-  // Reemplazar todas las variables en el string
-  let result = str;
-  for (const [key, value] of Object.entries(vars)) {
-    // Usar regex para reemplazar todas las ocurrencias
-    // El punto en claves como "user.name" se escapa con \\
-    result = result.replace(new RegExp(`\\{${key.replace('.', '\\.')}}`, 'g'), String(value));
-  }
-
-  // Reemplazar variables de fecha y hora (disponibles siempre)
-  result = result.replace(/\{date\}/g, dateStr);
-  result = result.replace(/\{time\}/g, timeStr);
-
-  return result;
+  return vars;
 };
 
-module.exports = { replaceVars };
+/**
+ * Reemplaza todas las variables en un string con sus valores reales.
+ * Mantiene el orden original: primero las variables de la fuente y después
+ * date/time, para que un objeto plano pueda aportar sus propios valores.
+ */
+const replaceVars = (str, source) => {
+  if (!str) return '';
+  const { date, time } = obtenerVarsFechaHora();
+  return sustituirVars(str, obtenerVarsBase(source))
+    .replace(/\{date\}/g, () => date)
+    .replace(/\{time\}/g, () => time);
+};
+
+module.exports = { replaceVars, obtenerVarsBase, obtenerVarsFechaHora, sustituirVars };
