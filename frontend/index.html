@@ -59,23 +59,34 @@
       </div>
     </div>
 
-    <!-- Sidebar -->
-    <aside class="fixed left-0 top-0 h-full w-64 bg-dark-800 border-r border-gray-800 flex flex-col z-50">
-      <div class="p-6 border-b border-gray-800">
-        <div class="flex items-center gap-3">
-          <img v-if="dashboardConfig.logo" :src="dashboardConfig.logo" class="w-10 h-10 rounded-xl object-cover">
-          <div v-else class="w-10 h-10 rounded-xl bg-discord flex items-center justify-center font-bold text-lg">H</div>
-          <div>
-            <h1 class="font-bold text-sm">{{ dashboardConfig.title || "Hazuru's Assistant" }}</h1>
-            <p class="text-xs text-gray-500">{{ dashboardConfig.subtitle || 'Dashboard' }}</p>
+    <!-- Overlay: al abrir el menú en móvil, oscurece el contenido y cierra al tocar -->
+    <div v-if="sidebarOpen" @click="cerrarSidebar"
+      class="fixed inset-0 bg-black/60 z-40 lg:hidden" aria-hidden="true"></div>
+
+    <!-- Sidebar (desliza desde la izquierda en móvil) -->
+    <aside class="fixed left-0 top-0 h-full w-64 bg-dark-800 border-r border-gray-800 flex flex-col z-50 transition-transform duration-300"
+      :class="sidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'"
+      aria-label="Navegación principal">
+      <div class="p-6 border-b border-gray-800 flex items-center justify-between gap-2">
+        <div class="flex items-center gap-3 min-w-0">
+          <img v-if="dashboardConfig.logo" :src="dashboardConfig.logo" class="w-10 h-10 rounded-xl object-cover shrink-0">
+          <div v-else class="w-10 h-10 rounded-xl bg-discord flex items-center justify-center font-bold text-lg shrink-0">H</div>
+          <div class="min-w-0">
+            <h1 class="font-bold text-sm truncate">{{ dashboardConfig.title || "Hazuru's Assistant" }}</h1>
+            <p class="text-xs text-gray-500 truncate">{{ dashboardConfig.subtitle || 'Dashboard' }}</p>
           </div>
         </div>
+        <!-- Botón para cerrar (visible siempre, útil en móvil) -->
+        <button @click="toggleSidebar" class="text-gray-500 hover:text-white p-1.5 rounded-lg hover:bg-dark-700 transition-colors shrink-0"
+          aria-label="Cerrar menú lateral" title="Cerrar menú">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
       </div>
-      <nav class="flex-1 p-4 space-y-1">
+      <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
         <button v-for="item in navItems" :key="item.id" @click="currentPage = item.id"
           :class="currentPage === item.id ? 'bg-discord/20 text-discord border-discord/30' : 'text-gray-400 hover:text-white hover:bg-dark-700 border-transparent'"
-          class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 border">
-          <span v-html="item.icon"></span>{{ item.label }}
+          class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 border text-left">
+          <span v-html="item.icon" class="shrink-0"></span>{{ item.label }}
         </button>
       </nav>
       <div class="p-4 border-t border-gray-800">
@@ -86,22 +97,49 @@
       </div>
     </aside>
 
-    <!-- Main Content -->
-    <main class="ml-64 min-h-screen">
-      <header class="sticky top-0 z-40 bg-dark-900/80 backdrop-blur-xl border-b border-gray-800 px-8 py-4">
-        <div class="flex items-center justify-between">
-          <div>
-            <h2 class="text-xl font-bold">{{ currentPageTitle }}</h2>
-            <p class="text-sm text-gray-500">{{ currentPageDesc }}</p>
+    <!-- Main Content: el margen izquierdo aparece solo en escritorio con el menú abierto -->
+    <main class="min-h-screen transition-all duration-300" :class="sidebarOpen ? 'lg:ml-64' : ''">
+      <header class="sticky top-0 z-30 bg-dark-900/80 backdrop-blur-xl border-b border-gray-800 px-4 sm:px-8 py-4">
+        <div class="flex items-center justify-between gap-4">
+          <div class="flex items-center gap-3 min-w-0">
+            <!-- Botón hamburguesa: siempre visible para poder volver a abrir el menú -->
+            <button @click="toggleSidebar" class="shrink-0 text-gray-400 hover:text-white p-2 -ml-2 rounded-lg hover:bg-dark-700 transition-colors"
+              :aria-label="sidebarOpen ? 'Cerrar menú' : 'Abrir menú'" :title="sidebarOpen ? 'Cerrar menú' : 'Abrir menú'">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            </button>
+            <div class="min-w-0">
+              <h2 class="text-lg sm:text-xl font-bold truncate">{{ currentPageTitle }}</h2>
+              <p class="text-xs sm:text-sm text-gray-500 truncate">{{ currentPageDesc }}</p>
+            </div>
           </div>
-          <div v-if="selectedGuild" class="flex items-center gap-3 bg-dark-700 px-4 py-2 rounded-xl">
-            <img :src="selectedGuild.icon || 'https://cdn.discordapp.com/embed/avatars/0.png'" class="w-8 h-8 rounded-full">
-            <span class="font-medium text-sm">{{ selectedGuild.name }}</span>
+          <div v-if="selectedGuild" class="flex items-center gap-2 bg-dark-700 px-3 py-2 rounded-xl shrink-0">
+            <img :src="selectedGuild.icon || 'https://cdn.discordapp.com/embed/avatars/0.png'" class="w-7 h-7 rounded-full" :alt="selectedGuild.name">
+            <span class="font-medium text-sm hidden sm:block max-w-[140px] truncate">{{ selectedGuild.name }}</span>
           </div>
         </div>
       </header>
 
-      <div class="p-8">
+      <div class="p-4 sm:p-8">
+        <!-- ESTADO VACÍO: cuando la sección necesita un servidor y no hay ninguno elegido -->
+        <div v-if="PAGINAS_CON_GUILD.includes(currentPage) && !selectedGuild"
+          class="max-w-xl mx-auto mt-10 text-center">
+          <div class="bg-card rounded-3xl border border-gray-800 p-10 shadow-xl">
+            <div class="w-20 h-20 mx-auto mb-6 rounded-2xl bg-discord/15 border border-discord/30 flex items-center justify-center text-4xl">
+              🖥️
+            </div>
+            <h3 class="text-xl font-semibold text-white mb-2">Elegí un servidor para continuar</h3>
+            <p class="text-sm text-gray-400 leading-relaxed mb-6">
+              Esta sección necesita un servidor seleccionado. Andá al inicio y elegí uno de la lista
+              para poder ver y cambiar su configuración.
+            </p>
+            <button @click="irASeleccionarGuild"
+              class="inline-flex items-center gap-2 bg-discord hover:bg-discord-hover text-white px-6 py-3 rounded-xl text-sm font-medium transition-all shadow-lg shadow-discord/20">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+              Ver servidores
+            </button>
+          </div>
+        </div>
+
         <!-- HOME -->
         <div v-if="currentPage === 'home'" class="space-y-8">
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

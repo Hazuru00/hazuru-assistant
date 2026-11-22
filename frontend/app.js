@@ -8,6 +8,11 @@ createApp({
     const selectedGuild = ref(null);
     const channels = ref([]);
     const currentPage = ref('home');
+    // Panel lateral: abierto por defecto en escritorio, cerrado en móvil.
+    const sidebarOpen = ref(window.innerWidth >= 1024);
+    const toggleSidebar = () => { sidebarOpen.value = !sidebarOpen.value; };
+    // Al elegir una página desde el celular se cierra el menú automáticamente.
+    const cerrarSidebar = () => { if (window.innerWidth < 1024) sidebarOpen.value = false; };
     const loadingGuilds = ref(true);
     const saving = ref(false);
     const sendingPreview = ref(false);
@@ -865,6 +870,18 @@ createApp({
       if (value) regeneratePreview();
     });
 
+    // Páginas que necesitan un servidor elegido para mostrar contenido.
+    // El resto (inicio, comandos, ajustes) funciona sin selección.
+    const PAGINAS_CON_GUILD = [
+      'welcome', 'farewell', 'private', 'boost', 'ban', 'kick',
+      'autorole', 'levels', 'automod', 'logging',
+    ];
+
+    // Ir a la pantalla de inicio para elegir un servidor desde el estado vacío.
+    const irASeleccionarGuild = () => {
+      currentPage.value = 'home';
+    };
+
     const selectGuild = async (guild) => {
       selectedGuild.value = guild;
       currentPage.value = 'welcome';
@@ -1073,6 +1090,7 @@ createApp({
     // si el bot se reinició o cambiaron los comandos, se refleja al instante.
     watch(currentPage, (pagina) => {
       if (pagina === 'commands') loadCommands();
+      cerrarSidebar();
     });
 
     onMounted(() => {
@@ -1095,6 +1113,8 @@ createApp({
       commandsLoading, commandsError, commandSearch, commandCategory,
       commandCategories, filteredCommands, loadCommands,
       commandGroups, iconoComando, colorCategoria,
+      sidebarOpen, toggleSidebar, cerrarSidebar,
+      PAGINAS_CON_GUILD, irASeleccionarGuild,
       navItems, currentPageTitle, currentPageDesc, loadingGuilds, saving, toasts,
       welcomeConfig, farewellConfig, privateConfig, boostConfig, banConfig, kickConfig, autoRoleConfig, autoRoleTab,
       levelsConfig, levelsTab, levelsLeaderboard,
