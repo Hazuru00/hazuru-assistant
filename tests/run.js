@@ -43,6 +43,42 @@ const recordatorios = {
 };
 simular('src/database/reminders.js', { getReminders: (guildId) => recordatorios[guildId] || {} });
 
+// --- Datos falsos de configuración y advertencias ---
+const configGuild = {
+  welcome: {
+    enabled: true,
+    channel: '222222222222222222',
+    message: 'Bienvenido {user.name} a {server}',
+    embedEnabled: true,
+    embed: { title: 'Hola {user.name}', description: 'Sos el miembro {memberCount}', color: '#5865F2' },
+  },
+  privateWelcome: { enabled: true, message: 'DM para {user.name}', embedEnabled: false },
+  ban: { enabled: true, channel: '333333333333333333', message: '{user.name} baneado por {moderator}', embedEnabled: false },
+};
+const escriturasConfig = [];
+simular('src/database/index.js', {
+  getGuild: (guildId) => configGuild,
+  updateGuild: (guildId, datos) => { escriturasConfig.push({ guildId, datos }); },
+  defaultConfig: () => configGuild,
+  defaultEmbed: () => ({}),
+});
+simular('src/database/warnings.js', {
+  getWarnings: (guildId, userId) => advertencias[guildId]?.[userId] || [],
+  getAllGuildWarnings: (guildId) => advertencias[guildId] || {},
+});
+const advertencias = {
+  'guild-1': {
+    'user-9': [
+      { id: 'w1', reason: 'Spam', moderatorId: 'mod-1', timestamp: '2026-01-01T00:00:00.000Z' },
+      { id: 'w2', reason: 'Insultos', moderatorId: 'mod-1', timestamp: '2026-02-01T00:00:00.000Z' },
+    ],
+  },
+};
+const guardados = [];
+simular('src/utils/configEdit.js', {
+  guardarCampo: (guildId, seccion, campo, valor) => guardados.push({ guildId, seccion, campo, valor }),
+});
+
 const pruebas = [];
 const prueba = (nombre, fn) => pruebas.push({ nombre, fn });
 
@@ -54,9 +90,15 @@ const prueba = (nombre, fn) => pruebas.push({ nombre, fn });
 const interaccion = (opciones = {}) => {
   const estado = { reply: null };
   const datos = {
-    guild: { id: 'guild-1', name: 'Servidor' },
+    guild: {
+      id: 'guild-1', name: 'Servidor', memberCount: 42,
+      iconURL: () => '', premiumSubscriptionCount: 0,
+    },
     guildId: 'guild-1',
-    user: { id: 'user-1', tag: 'Usuario#0001' },
+    user: {
+      id: 'user-1', username: 'Usuario', tag: 'Usuario#0001',
+      displayAvatarURL: () => '', createdTimestamp: Date.now(),
+    },
     memberPermissions: { has: () => opciones.admin === true },
     channel: { id: '111111111111111111' },
     client: { commands: new Collection() },
@@ -64,6 +106,8 @@ const interaccion = (opciones = {}) => {
       getString: (nombre) => opciones[nombre],
       getBoolean: (nombre) => opciones[nombre],
       getChannel: (nombre) => opciones[nombre],
+      getUser: (nombre) => opciones[nombre] || null,
+      getRole: (nombre) => opciones[nombre] || null,
       getInteger: (nombre) => opciones[nombre],
       getSubcommand: () => opciones.sub || undefined,
       getSubcommandGroup: () => undefined,
@@ -187,6 +231,133 @@ prueba('/say solo lo puede usar el dueño', async () => {
   await cmd.execute(dueno.datos);
   assert.strictEqual(canal.enviado, true, 'el dueño sí envía');
   assert(dueno.estado.reply.content.startsWith('✅'), 'confirma');
+});
+
+// ---------------------------------------------------------------------------
+// Tanda 2: /preview y su helper
+// ---------------------------------------------------------------------------
+prueba('el helper de preview resuelve las variables como los eventos reales', () => {
+  const { construirMensajePreview } = require(ruta('src/utils/previewMessage.js'));
+  const guild = { id: 'guild-1', name: 'Servidor', memberCount: 42, iconURL: () => '' };
+  const usuario = {
+    id: 'user-1', username: 'Ana', tag: 'Ana#0001',
+    displayAvatarURL: () => 'http://avatar', createdTimestamp: Date.now(),
+  };
+  const bienvenida = construirMensajePreview({
+    guild, guildId: 'guild-1', tipo: 'welcome', usuario,
+  });
+  assert(bienvenida.mensaje.includes('Ana') && bienvenida.mensaje.includes('Servidor'), 'variables de texto');
+  assert.strictEqual(bienvenida.embed.toJSON().title, 'Hola Ana', 'variables en embed');
+  assert.strictEqual(bienvenida.canalId, '222222222222222222', 'canal configurado');
+
+  const ban = construirMensajePreview({
+    guild, guildId: 'guild-1', tipo: 'ban', usuario, moderador: { id: 'mod-1' },
+  });
+  assert(ban.mensaje.includes('Ana baneado por <@mod-1>'), 'variables de ban');
+});
+
+prueba('/preview envía el mensaje al canal correcto', async () => {
+  const cmd = require(ruta('src/commands/preview.js'));
+  const enviados = [];
+  const canal = { id: '222222222222222222', send: async (payload) => enviados.push(payload) };
+  const guild = {
+    id: 'guild-1', name: 'Servidor', memberCount: 42, iconURL: () => '',
+    channels: { cache: new Map([['222222222222222222', canal]]) },
+  };
+  const { datos, estado } = interaccion({ tipo: 'welcome', canal, admin: true });
+  datos.guild = guild;
+  await cmd.execute(datos);
+  assert.strictEqual(enviados.length, 1, 'envía un mensaje');
+  assert(enviados[0].content.includes('Bienvenido'), 'contenido resuelto');
+  assert.strictEqual(enviados[0].embeds.length, 1, 'incluye embed');
+  assert(estado.reply.content.startsWith('✅'), 'confirma');
+});
+
+prueba('/preview avisa si la sección está vacía', async () => {
+  const cmd = require(ruta('src/commands/preview.js'));
+  const original = { message: configGuild.ban.message, embedEnabled: configGuild.ban.embedEnabled };
+  configGuild.ban.message = '';
+  configGuild.ban.embedEnabled = false;
+  try {
+    const { datos, estado } = interaccion({ tipo: 'ban', admin: true });
+    await cmd.execute(datos);
+    assert(estado.reply.content.includes('no tiene mensaje configurado'), 'avisa configuración vacía');
+  } finally {
+    configGuild.ban.message = original.message;
+    configGuild.ban.embedEnabled = original.embedEnabled;
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Tanda 2: /announce-preview
+// ---------------------------------------------------------------------------
+prueba('/announce-preview genera un embed privado con mención y color', async () => {
+  const cmd = require(ruta('src/commands/announce-preview.js'));
+  const { datos, estado } = interaccion({
+    titulo: 'Aviso', mensaje: 'Hola a todos', color: '#ff0000', mencion: { id: 'rol-1' },
+  });
+  await cmd.execute(datos);
+  const embed = estado.reply.embeds[0];
+  assert.strictEqual(estado.reply.ephemeral, true, 'es privado');
+  assert.strictEqual(embed.title, 'Aviso');
+  assert.strictEqual(embed.description, 'Hola a todos');
+  assert(estado.reply.content.includes('<@&rol-1>'), 'muestra la mención');
+});
+
+// ---------------------------------------------------------------------------
+// Tanda 2: /dm-template
+// ---------------------------------------------------------------------------
+prueba('/dm-template consulta el template sin permiso de dueño', async () => {
+  const cmd = require(ruta('src/commands/dm-template.js'));
+  const { datos, estado } = interaccion();
+  await cmd.execute(datos);
+  assert(estado.reply.content.includes('Template actual'), 'muestra el template');
+  assert.strictEqual(guardados.length, 0, 'no escribe nada');
+});
+
+prueba('/dm-template solo permite editar al dueño', async () => {
+  const cmd = require(ruta('src/commands/dm-template.js'));
+  const ajeno = interaccion({ mensaje: 'nuevo DM' });
+  ajeno.datos.user = { id: 'otro' };
+  await cmd.execute(ajeno.datos);
+  assert(ajeno.estado.reply.content.includes('dueño'), 'niega a otro usuario');
+  assert.strictEqual(guardados.length, 0, 'no guarda');
+
+  const dueno = interaccion({ mensaje: 'nuevo DM' });
+  dueno.datos.user = { id: 'owner-1' };
+  await cmd.execute(dueno.datos);
+  assert.strictEqual(guardados.length, 1, 'guarda una vez');
+  assert.strictEqual(guardados[0].campo, 'message');
+  assert.strictEqual(guardados[0].seccion, 'privateWelcome');
+  assert.strictEqual(guardados[0].valor, 'nuevo DM');
+});
+
+// ---------------------------------------------------------------------------
+// Tanda 2: /modlog
+// ---------------------------------------------------------------------------
+prueba('/modlog lista advertencias ordenadas y filtra por usuario', async () => {
+  const cmd = require(ruta('src/commands/modlog.js'));
+  const general = interaccion({ admin: true });
+  await cmd.execute(general.datos);
+  const descripcion = general.estado.reply.embeds[0].toJSON().description;
+  assert(descripcion.indexOf('Insultos') < descripcion.indexOf('Spam'), 'más reciente primero');
+  assert(general.estado.reply.embeds[0].toJSON().footer.text.includes('2 advertencia'), 'contador');
+
+  const filtrado = interaccion({ admin: true, usuario: { id: 'user-9' } });
+  await cmd.execute(filtrado.datos);
+  assert(filtrado.estado.reply.embeds[0].toJSON().description.includes('Insultos'), 'filtra por usuario');
+});
+
+prueba('/modlog exige permiso y avisa cuando no hay datos', async () => {
+  const cmd = require(ruta('src/commands/modlog.js'));
+  const sinPermiso = interaccion();
+  await cmd.execute(sinPermiso.datos);
+  assert(sinPermiso.estado.reply.content.includes('gestionar mensajes'), 'niega sin permiso');
+
+  const vacio = interaccion({ admin: true });
+  vacio.datos.guildId = 'sin-datos';
+  await cmd.execute(vacio.datos);
+  assert(vacio.estado.reply.content.includes('No hay advertencias'), 'avisa si está vacío');
 });
 
 // ---------------------------------------------------------------------------
