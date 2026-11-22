@@ -1105,6 +1105,10 @@ createApp({
         stats.value[1].value = data.users;
         stats.value[2].value = formatUptime(data.uptime);
       });
+      // Escape cierra el menú lateral, igual que en cualquier app nativa.
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && sidebarOpen.value) sidebarOpen.value = false;
+      });
       loadGuilds();
     });
 

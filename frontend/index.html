@@ -43,12 +43,18 @@
     .embed-preview { border-left: 4px solid; background: #2f3136; border-radius: 4px; }
     .upload-zone { position: relative; overflow: hidden; }
     .upload-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    /* Anillo de foco visible solo con teclado, para no ensuciar con el mouse */
+    :focus-visible { outline: 2px solid #5865F2; outline-offset: 2px; border-radius: 6px; }
+    /* Respetar la preferencia del sistema de reducir animaciones */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    }
   </style>
 </head>
 <body class="bg-dark-900 text-gray-100 font-sans min-h-screen">
   <div id="app">
-    <!-- Toast Notifications -->
-    <div class="fixed top-4 right-4 z-[100] space-y-2">
+    <!-- Toast Notifications: región viva para anunciarlos a lectores de pantalla -->
+    <div class="fixed top-4 right-4 z-[100] space-y-2" role="status" aria-live="polite" aria-atomic="false">
       <div v-for="toast in toasts" :key="toast.id"
         class="toast-enter-active flex items-center gap-3 px-5 py-3 rounded-xl shadow-2xl border backdrop-blur-sm min-w-[280px]"
         :class="toast.type === 'success' ? 'bg-accent-green/10 border-accent-green/30 text-accent-green' : toast.type === 'error' ? 'bg-accent-red/10 border-accent-red/30 text-accent-red' : 'bg-discord/10 border-discord/30 text-discord'">
@@ -83,7 +89,7 @@
         </button>
       </div>
       <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
-        <button v-for="item in navItems" :key="item.id" @click="currentPage = item.id"
+        <button v-for="item in navItems" :key="item.id" @click="currentPage = item.id; cerrarSidebar()"
           :class="currentPage === item.id ? 'bg-discord/20 text-discord border-discord/30' : 'text-gray-400 hover:text-white hover:bg-dark-700 border-transparent'"
           class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 border text-left">
           <span v-html="item.icon" class="shrink-0"></span>{{ item.label }}
@@ -241,10 +247,11 @@
                   <p class="text-sm text-gray-500">Embed desactivado. Solo se enviara el texto del mensaje.</p>
                 </div>
 
-                <div v-if="currentConfig.embedEnabled" class="flex gap-1 bg-dark-700 p-1 rounded-xl">
+                <div v-if="currentConfig.embedEnabled" class="flex gap-1 bg-dark-700 p-1 rounded-xl" role="tablist" aria-label="Partes del embed">
                   <button v-for="tab in embedTabs" :key="tab.id" @click="activeEmbedTab = tab.id"
                     :class="activeEmbedTab === tab.id ? 'bg-discord text-white' : 'text-gray-400 hover:text-white'"
-                    class="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all">
+                    class="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                    role="tab" :aria-selected="activeEmbedTab === tab.id">
                     {{ tab.label }}
                   </button>
                 </div>
@@ -259,9 +266,9 @@
                     <div class="flex-1">
                       <label class="block text-xs text-gray-500 mb-1">Color</label>
                       <div class="flex items-center gap-2">
-                        <input type="color" v-model="currentConfig.embed.color" @change="saveConfig">
+                        <input type="color" v-model="currentConfig.embed.color" @change="saveConfig" aria-label="Color del embed">
                         <div class="flex gap-1">
-                          <button v-for="c in colorPresets" :key="c" @click="currentConfig.embed.color = c; saveConfig()" class="w-6 h-6 rounded-full border-2 border-transparent hover:border-white transition-all" :style="{ background: c }"></button>
+                          <button v-for="c in colorPresets" :key="c" @click="currentConfig.embed.color = c; saveConfig()" class="w-6 h-6 rounded-full border-2 border-transparent hover:border-white transition-all" :style="{ background: c }" :aria-label="'Color ' + c" :title="c"></button>
                         </div>
                       </div>
                     </div>
@@ -797,7 +804,7 @@
                           <td><input type="number" v-model.number="kf.rotate" step="15" class="w-14 bg-dark-700 border border-gray-700 rounded px-1 py-1"></td>
                           <td><input type="number" v-model.number="kf.chars" min="0" max="1" step="0.1" class="w-14 bg-dark-700 border border-gray-700 rounded px-1 py-1"></td>
                           <td><input type="number" v-model.number="kf.reveal" min="0" max="1" step="0.1" class="w-14 bg-dark-700 border border-gray-700 rounded px-1 py-1"></td>
-                          <td><button @click="removeKeyframe(i)" :disabled="animEditor.definition.keyframes.length <= 2" class="text-accent-red hover:text-red-400 disabled:opacity-30">×</button></td>
+                          <td><button @click="removeKeyframe(i)" :disabled="animEditor.definition.keyframes.length <= 2" class="text-accent-red hover:text-red-400 disabled:opacity-30" aria-label="Quitar keyframe" title="Quitar keyframe">×</button></td>
                         </tr>
                       </tbody>
                     </table>
@@ -848,11 +855,11 @@
 
             <!-- Tabs -->
             <div v-if="autoRoleConfig.enabled" class="space-y-4">
-              <div class="flex gap-2 border-b border-gray-700 pb-2">
-                <button @click="autoRoleTab = 'basic'" :class="autoRoleTab === 'basic' ? 'bg-discord text-white' : 'bg-dark-700 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all">Basico</button>
-                <button @click="autoRoleTab = 'smart'" :class="autoRoleTab === 'smart' ? 'bg-discord text-white' : 'bg-dark-700 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all">Inteligente</button>
-                <button @click="autoRoleTab = 'milestones'" :class="autoRoleTab === 'milestones' ? 'bg-discord text-white' : 'bg-dark-700 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all">Milestones</button>
-                <button @click="autoRoleTab = 'reactions'" :class="autoRoleTab === 'reactions' ? 'bg-discord text-white' : 'bg-dark-700 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all">Reaction Roles</button>
+              <div class="flex gap-2 border-b border-gray-700 pb-2" role="tablist" aria-label="Secciones de auto-role">
+                <button @click="autoRoleTab = 'basic'" :class="autoRoleTab === 'basic' ? 'bg-discord text-white' : 'bg-dark-700 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all" role="tab" :aria-selected="autoRoleTab === 'basic'">Basico</button>
+                <button @click="autoRoleTab = 'smart'" :class="autoRoleTab === 'smart' ? 'bg-discord text-white' : 'bg-dark-700 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all" role="tab" :aria-selected="autoRoleTab === 'smart'">Inteligente</button>
+                <button @click="autoRoleTab = 'milestones'" :class="autoRoleTab === 'milestones' ? 'bg-discord text-white' : 'bg-dark-700 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all" role="tab" :aria-selected="autoRoleTab === 'milestones'">Milestones</button>
+                <button @click="autoRoleTab = 'reactions'" :class="autoRoleTab === 'reactions' ? 'bg-discord text-white' : 'bg-dark-700 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all" role="tab" :aria-selected="autoRoleTab === 'reactions'">Reaction Roles</button>
               </div>
 
               <!-- TAB: Basico -->
@@ -1001,7 +1008,7 @@
                         <option v-for="role in roles" :key="role.id" :value="role.id">{{ role.name }}</option>
                       </select>
                       <input v-model="r.label" placeholder="Label" class="w-24 bg-dark-600 border border-gray-700 rounded-lg px-2 py-1.5 text-sm focus:border-discord focus:outline-none">
-                      <button @click="rr.roles.splice(ri, 1)" class="text-accent-red hover:text-red-400 text-xs">X</button>
+                      <button @click="rr.roles.splice(ri, 1)" class="text-accent-red hover:text-red-400 text-xs" aria-label="Quitar rol" title="Quitar rol">X</button>
                     </div>
                     <button @click="rr.roles.push({ emoji: '', roleId: '', label: '' })" class="text-xs text-discord hover:text-discord-hover transition-colors">+ Agregar rol</button>
                   </div>
@@ -1051,14 +1058,14 @@
             </div>
 
             <div v-if="levelsConfig.enabled" class="space-y-4">
-              <div class="flex gap-2 border-b border-gray-700 pb-2">
-                <button @click="levelsTab = 'general'" :class="levelsTab === 'general' ? 'bg-discord text-white' : 'bg-dark-700 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all">General</button>
-                <button @click="levelsTab = 'multipliers'" :class="levelsTab === 'multipliers' ? 'bg-discord text-white' : 'bg-dark-700 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all">Multiplicadores</button>
-                <button @click="levelsTab = 'levelroles'" :class="levelsTab === 'levelroles' ? 'bg-discord text-white' : 'bg-dark-700 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all">Roles por Nivel</button>
-                <button @click="levelsTab = 'icons'" :class="levelsTab === 'icons' ? 'bg-discord text-white' : 'bg-dark-700 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all">Iconos</button>
-                <button @click="levelsTab = 'achievements'" :class="levelsTab === 'achievements' ? 'bg-discord text-white' : 'bg-dark-700 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all">Logros</button>
-                <button @click="levelsTab = 'commands'" :class="levelsTab === 'commands' ? 'bg-discord text-white' : 'bg-dark-700 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all">Comandos</button>
-                <button @click="levelsTab = 'ranking'" :class="levelsTab === 'ranking' ? 'bg-discord text-white' : 'bg-dark-700 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all">Ranking</button>
+              <div class="flex gap-2 border-b border-gray-700 pb-2 overflow-x-auto" role="tablist" aria-label="Secciones de niveles">
+                <button @click="levelsTab = 'general'" :class="levelsTab === 'general' ? 'bg-discord text-white' : 'bg-dark-700 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap shrink-0" role="tab" :aria-selected="levelsTab === 'general'">General</button>
+                <button @click="levelsTab = 'multipliers'" :class="levelsTab === 'multipliers' ? 'bg-discord text-white' : 'bg-dark-700 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap shrink-0" role="tab" :aria-selected="levelsTab === 'multipliers'">Multiplicadores</button>
+                <button @click="levelsTab = 'levelroles'" :class="levelsTab === 'levelroles' ? 'bg-discord text-white' : 'bg-dark-700 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap shrink-0" role="tab" :aria-selected="levelsTab === 'levelroles'">Roles por Nivel</button>
+                <button @click="levelsTab = 'icons'" :class="levelsTab === 'icons' ? 'bg-discord text-white' : 'bg-dark-700 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap shrink-0" role="tab" :aria-selected="levelsTab === 'icons'">Iconos</button>
+                <button @click="levelsTab = 'achievements'" :class="levelsTab === 'achievements' ? 'bg-discord text-white' : 'bg-dark-700 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap shrink-0" role="tab" :aria-selected="levelsTab === 'achievements'">Logros</button>
+                <button @click="levelsTab = 'commands'" :class="levelsTab === 'commands' ? 'bg-discord text-white' : 'bg-dark-700 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap shrink-0" role="tab" :aria-selected="levelsTab === 'commands'">Comandos</button>
+                <button @click="levelsTab = 'ranking'" :class="levelsTab === 'ranking' ? 'bg-discord text-white' : 'bg-dark-700 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap shrink-0" role="tab" :aria-selected="levelsTab === 'ranking'">Ranking</button>
               </div>
 
               <!-- TAB: General -->
@@ -1539,12 +1546,12 @@
             <div class="relative grid grid-cols-1 md:grid-cols-2 gap-3 mt-6">
               <div class="relative">
                 <svg class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                <input v-model="commandSearch" type="text" placeholder="Buscar por nombre, sintaxis o descripción…"
+                <input v-model="commandSearch" type="search" aria-label="Buscar comandos" placeholder="Buscar por nombre, sintaxis o descripción…"
                   class="w-full bg-dark-700 border border-gray-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-discord transition-colors">
               </div>
               <div class="relative">
                 <svg class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h10"></path></svg>
-                <select v-model="commandCategory"
+                <select v-model="commandCategory" aria-label="Filtrar comandos por categoría"
                   class="w-full appearance-none bg-dark-700 border border-gray-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white focus:outline-none focus:border-discord transition-colors">
                   <option v-for="cat in commandCategories" :key="cat" :value="cat">{{ cat }}</option>
                 </select>
