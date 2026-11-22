@@ -24,6 +24,33 @@ const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 // Discord permite 1024 caracteres por field. Se deja margen para el título.
 const LIMITE_CAMPO = 1000;
 
+// Secciones visuales del help. Solo agrupa nombres: la sintaxis y las
+// descripciones siguen viniendo de los comandos reales, no de acá.
+// Un comando nuevo que no esté en esta lista aparece igual en "Otros".
+const SECCIONES = [
+  { titulo: '📊 Información', comandos: ['server', 'serverinfo', 'userinfo', 'avatar', 'botinfo'] },
+  { titulo: '🎲 Diversión', comandos: ['8ball'] },
+  { titulo: '⚙️ Utilidad', comandos: ['help', 'poll', 'remind', 'announce', 'nick', 'config'] },
+  {
+    titulo: '📈 Niveles',
+    comandos: ['rank', 'leaderboard', 'profile', 'achievements', 'racha', 'title', 'setlevel', 'setxp', 'resetlevels'],
+  },
+  {
+    titulo: '🔨 Moderación',
+    comandos: ['ban', 'kick', 'warn', 'warnings', 'unwarn', 'timeout', 'untimeout', 'purge', 'slowmode'],
+  },
+  { titulo: '🔐 Dueño del bot', comandos: ['owner'] },
+];
+
+const TITULO_OTROS = '🔧 Otros';
+
+/**
+ * Devuelve el título de sección que corresponde a un comando.
+ * @param {string} nombre - Nombre del comando
+ * @returns {string} Título de la sección, o "Otros" si no está clasificado
+ */
+const seccionDe = (nombre) => SECCIONES.find(s => s.comandos.includes(nombre))?.titulo || TITULO_OTROS;
+
 /**
  * Recorre un comando y devuelve una variante por cada subcomando que tenga.
  * Los grupos (tipo 2) se bajan recursivamente hasta llegar a un subcomando
@@ -68,9 +95,10 @@ const lineasComando = (json) => {
 /**
  * Reparte las líneas en campos que no superen el límite de Discord.
  * @param {string[]} lineas - Líneas con la sintaxis y descripción de cada comando
+ * @param {string} titulo - Nombre de la sección para los campos
  * @returns {Array<{name: string, value: string, inline: boolean}>} Campos del embed
  */
-const agruparEnCampos = (lineas) => {
+const agruparEnCampos = (lineas, titulo) => {
   const grupos = [];
   let actual = [];
   let largo = 0;
@@ -88,7 +116,7 @@ const agruparEnCampos = (lineas) => {
   if (actual.length) grupos.push(actual);
 
   return grupos.map((grupo, indice) => ({
-    name: grupos.length > 1 ? `📌 Comandos (${indice + 1}/${grupos.length})` : '📌 Comandos',
+    name: grupos.length > 1 ? `${titulo} (${indice + 1}/${grupos.length})` : titulo,
     value: grupo.join('\n'),
     inline: false,
   }));
@@ -103,18 +131,34 @@ module.exports = {
     // client.commands es la misma Collection que usa el dispatcher de slash
     // commands: la fuente de verdad de lo que realmente puede ejecutar el bot.
     const comandos = interaction.client.commands;
-    const lineas = comandos
-      ? [...comandos.values()]
-        .map(comando => comando.data.toJSON())
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .flatMap(lineasComando)
-      : ['No se pudieron cargar los comandos.'];
+    const definiciones = comandos
+      ? [...comandos.values()].map(comando => comando.data.toJSON())
+      : [];
+
+    // Se arma un grupo por sección. Los comandos desconocidos van a "Otros",
+    // así un comando nuevo nunca desaparece del help aunque no se clasifique.
+    const porSeccion = new Map();
+    for (const json of definiciones.sort((a, b) => a.name.localeCompare(b.name))) {
+      const titulo = seccionDe(json.name);
+      if (!porSeccion.has(titulo)) porSeccion.set(titulo, []);
+      porSeccion.get(titulo).push(...lineasComando(json));
+    }
+    if (!definiciones.length) {
+      porSeccion.set(TITULO_OTROS, ['No se pudieron cargar los comandos.']);
+    }
+
+    const campos = [];
+    const titulos = [...SECCIONES.map(s => s.titulo), TITULO_OTROS];
+    for (const titulo of titulos) {
+      const lineas = porSeccion.get(titulo);
+      if (lineas?.length) campos.push(...agruparEnCampos(lineas, titulo));
+    }
 
     const embed = new EmbedBuilder()
       .setTitle('Comandos Disponibles')
-      .setDescription('Sintaxis exacta de todos los comandos del bot:')
+      .setDescription('Sintaxis exacta de todos los comandos del bot, agrupada por sección:')
       .addFields(
-        ...agruparEnCampos(lineas),
+        ...campos,
         // Variables de mensaje disponibles en la configuración del panel web.
         {
           name: 'Variables de Mensaje',
