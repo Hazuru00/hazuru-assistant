@@ -16,7 +16,7 @@
 const SECCIONES = [
   { titulo: '📊 Información', comandos: ['server', 'serverinfo', 'userinfo', 'avatar', 'botinfo'] },
   { titulo: '🎲 Diversión', comandos: ['8ball'] },
-  { titulo: '⚙️ Utilidad', comandos: ['help', 'poll', 'poll-close', 'remind', 'remind-list', 'announce', 'announce-preview', 'nick', 'config', 'say', 'preview', 'dm-template'] },
+  { titulo: '⚙️ Utilidad', comandos: ['help', 'poll', 'poll-close', 'remind', 'remind-list', 'announce', 'announce-preview', 'nick', 'config', 'say', 'preview', 'dm-template', 'reaction-role'] },
   {
     titulo: '📈 Niveles',
     comandos: ['rank', 'leaderboard', 'profile', 'achievements', 'racha', 'title', 'setlevel', 'setxp', 'resetlevels'],

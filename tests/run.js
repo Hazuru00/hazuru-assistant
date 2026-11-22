@@ -54,6 +54,21 @@ const configGuild = {
   },
   privateWelcome: { enabled: true, message: 'DM para {user.name}', embedEnabled: false },
   ban: { enabled: true, channel: '333333333333333333', message: '{user.name} baneado por {moderator}', embedEnabled: false },
+  autoRole: {
+    enabled: true,
+    reactionRoles: [
+      {
+        id: 'rr1', enabled: true, channelId: '444444444444444444', messageId: '', mode: 'emoji',
+        embed: { title: 'Elige tu rol', description: 'Reacciona', color: '#5865F2' },
+        roles: [{ emoji: '🎮', roleId: 'rol-1', label: 'Gamer' }],
+      },
+      {
+        id: 'rr2', enabled: true, channelId: '555555555555555555', messageId: '', mode: 'select',
+        embed: { title: 'Menú de roles', description: 'Elegí', color: '#5865F2' },
+        roles: [{ emoji: '🎧', roleId: 'rol-2', label: 'Música' }],
+      },
+    ],
+  },
 };
 const escriturasConfig = [];
 simular('src/database/index.js', {
@@ -358,6 +373,58 @@ prueba('/modlog exige permiso y avisa cuando no hay datos', async () => {
   vacio.datos.guildId = 'sin-datos';
   await cmd.execute(vacio.datos);
   assert(vacio.estado.reply.content.includes('No hay advertencias'), 'avisa si está vacío');
+});
+
+// ---------------------------------------------------------------------------
+// Tanda 3: /reaction-role
+// ---------------------------------------------------------------------------
+prueba('/reaction-role list muestra los grupos configurados', async () => {
+  const cmd = require(ruta('src/commands/reaction-role.js'));
+  const { datos, estado } = interaccion({ sub: 'list', admin: true });
+  await cmd.execute(datos);
+  const texto = estado.reply.embeds[0].toJSON().description;
+  assert(texto.includes('🎮') === false, 'no muestra emojis sueltos');
+  assert(texto.includes('emojis') && texto.includes('menú'), 'muestra ambos modos');
+  assert(texto.includes('sin enviar'), 'indica que no están enviados');
+});
+
+prueba('/reaction-role send en modo emoji guarda el messageId', async () => {
+  const cmd = require(ruta('src/commands/reaction-role.js'));
+  const mensaje = { id: 'msg-999', react: async (emoji) => { mensaje.reaccion = emoji; } };
+  const canal = { send: async (payload) => { canal.enviado = payload; return mensaje; } };
+  const { datos, estado } = interaccion({ sub: 'send', grupo: 1, canal, admin: true });
+  const antes = escriturasConfig.length;
+  await cmd.execute(datos);
+  assert.strictEqual(mensaje.reaccion, '🎮', 'reacciona con el emoji configurado');
+  assert.strictEqual(canal.enviado.embeds.length, 1, 'envía el embed');
+  assert.strictEqual(escriturasConfig.length, antes + 1, 'guarda la configuración');
+  assert.strictEqual(escriturasConfig[antes].datos.autoRole.reactionRoles[0].messageId, 'msg-999', 'persiste el messageId');
+  assert(estado.reply.content.startsWith('✅'), 'confirma');
+});
+
+prueba('/reaction-role send en modo select envía el menú y respeta permisos', async () => {
+  const cmd = require(ruta('src/commands/reaction-role.js'));
+  const mensaje = { id: 'msg-1000' };
+  const canal = { send: async (payload) => { canal.enviado = payload; return mensaje; } };
+
+  const sinPermiso = interaccion({ sub: 'send', grupo: 2, canal });
+  await cmd.execute(sinPermiso.datos);
+  assert(sinPermiso.estado.reply.content.includes('administrador'), 'niega a no admin');
+  assert(!canal.enviado, 'no envía mensaje');
+
+  const { datos, estado } = interaccion({ sub: 'send', grupo: 2, canal, admin: true });
+  await cmd.execute(datos);
+  const componente = canal.enviado.components[0].toJSON();
+  assert.strictEqual(componente.components[0].custom_id, 'reaction_role_select', 'customId del select');
+  assert.strictEqual(componente.components[0].options[0].value, 'rol-2', 'opción del rol');
+  assert(estado.reply.content.startsWith('✅'), 'confirma');
+});
+
+prueba('/reaction-role rechaza un grupo inexistente', async () => {
+  const cmd = require(ruta('src/commands/reaction-role.js'));
+  const { datos, estado } = interaccion({ sub: 'send', grupo: 99, admin: true });
+  await cmd.execute(datos);
+  assert(estado.reply.content.includes('No existe el grupo'), 'avisa grupo inválido');
 });
 
 // ---------------------------------------------------------------------------
