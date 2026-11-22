@@ -196,6 +196,7 @@ Por ahora el alcance es el bot local: cada usuario crea su animación custom y l
 |---------|-------------|---------|
 | `/ping` | Latencia del bot | Todos |
 | `/serverinfo` | Info detallada del servidor | Todos |
+| `/server` | Estadísticas del servidor | Todos |
 | `/userinfo [usuario]` | Info de un usuario | Todos |
 | `/avatar [usuario]` | Avatar en alta resolución | Todos |
 | `/botinfo` | Stats del bot | Todos |
@@ -208,6 +209,7 @@ Por ahora el alcance es el bot local: cada usuario crea su animación custom y l
 | `/ban <usuario> [razón]` | Banear usuario | Ban Members |
 | `/kick <usuario> [razón]` | Expulsar usuario | Kick Members |
 | `/timeout <usuario> <duración> [razón]` | Silenciar temporal | Moderate Members |
+| `/untimeout <usuario>` | Quitar silencio | Moderate Members |
 | `/warn <usuario> <razón>` | Advertir usuario | Manage Messages |
 | `/warnings <usuario>` | Ver advertencias | Manage Messages |
 | `/unwarn <usuario> <id>` | Quitar advertencia | Manage Messages |
