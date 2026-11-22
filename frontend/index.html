@@ -422,6 +422,21 @@
                 </div>
 
                 <div>
+                  <label class="block text-sm font-medium text-gray-400 mb-2">Fuente</label>
+                  <div class="flex items-center gap-2">
+                    <select v-model="currentConfig.card.fontFamily" class="flex-1 bg-dark-700 border border-gray-700 rounded-xl px-4 py-3 text-sm focus:border-discord focus:outline-none transition-colors">
+                      <option value="Arial">Arial (Default)</option>
+                      <option value="DejaVu Sans">DejaVu Sans</option>
+                      <option v-for="f in availableFonts" :key="f.filename" :value="f.name">{{ f.name }}</option>
+                    </select>
+                    <label class="upload-zone bg-dark-700 hover:bg-dark-600 px-3 py-3 rounded-xl text-sm cursor-pointer border border-gray-700 hover:border-discord/50 transition-colors whitespace-nowrap">
+                      + Subir
+                      <input type="file" accept=".ttf,.otf,.woff,.woff2" @change="uploadFont" class="hidden">
+                    </label>
+                  </div>
+                </div>
+
+                <div>
                   <label class="block text-sm font-medium text-gray-400 mb-2">Fondo Personalizado</label>
                   <div class="flex items-center gap-3">
                     <label class="upload-zone bg-dark-700 hover:bg-dark-600 px-4 py-2 rounded-xl text-sm cursor-pointer border border-gray-700 hover:border-discord/50 transition-all">
@@ -430,6 +445,21 @@
                     </label>
                     <button v-if="currentConfig.card.background" @click="currentConfig.card.background = ''" class="text-xs text-accent-red hover:text-red-400 transition-colors">Eliminar</button>
                   </div>
+                </div>
+
+                <div v-if="currentConfig.card.background">
+                  <label class="block text-sm font-medium text-gray-400 mb-2">Escalado Fondo</label>
+                  <select v-model="currentConfig.card.bgScale" class="w-full bg-dark-700 border border-gray-700 rounded-xl px-4 py-3 text-sm focus:border-discord focus:outline-none transition-colors">
+                    <option value="cover">Cover (llenar)</option>
+                    <option value="contain">Contain (ajustar)</option>
+                    <option value="stretch">Stretch (estirar)</option>
+                    <option value="center">Center (centrar)</option>
+                  </select>
+                </div>
+
+                <div v-if="currentConfig.card.background">
+                  <label class="block text-sm font-medium text-gray-400 mb-2">Zoom Fondo: {{ currentConfig.card.bgZoom || 100 }}%</label>
+                  <input type="range" v-model.number="currentConfig.card.bgZoom" min="50" max="300" class="w-full accent-discord">
                 </div>
 
                 <div>
@@ -460,13 +490,60 @@
                 </div>
 
                 <div>
+                  <label class="block text-sm font-medium text-gray-400 mb-2">Tamaño Avatar: {{ currentConfig.card.avatarSize || 50 }}px</label>
+                  <input type="range" v-model.number="currentConfig.card.avatarSize" min="20" max="100" class="w-full accent-discord">
+                </div>
+
+                <div class="flex items-center justify-between p-3 bg-dark-700 rounded-xl">
+                  <div>
+                    <p class="text-sm font-medium">Borde Tarjeta</p>
+                    <p class="text-xs text-gray-500">Muestra u oculta el borde exterior</p>
+                  </div>
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" v-model="currentConfig.card.cardBorder" class="sr-only peer">
+                    <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent-green"></div>
+                  </label>
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-400 mb-2">Margen Borde: {{ currentConfig.card.cardMargin || 20 }}px</label>
+                  <input type="range" v-model.number="currentConfig.card.cardMargin" min="0" max="40" class="w-full accent-discord" :disabled="!currentConfig.card.cardBorder">
+                </div>
+
+                <div class="flex items-center justify-between p-3 bg-dark-700 rounded-xl">
+                  <div>
+                    <p class="text-sm font-medium">Borde Avatar</p>
+                    <p class="text-xs text-gray-500">Muestra u oculta el borde circular</p>
+                  </div>
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" v-model="currentConfig.card.avatarBorder" class="sr-only peer">
+                    <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent-green"></div>
+                  </label>
+                </div>
+
+                <div>
                   <label class="block text-sm font-medium text-gray-400 mb-2">Ancho Borde: {{ currentConfig.card.avatarBorderWidth }}px</label>
-                  <input type="range" v-model.number="currentConfig.card.avatarBorderWidth" min="0" max="15" class="w-full accent-discord">
+                  <input type="range" v-model.number="currentConfig.card.avatarBorderWidth" min="0" max="15" class="w-full accent-discord" :disabled="!currentConfig.card.avatarBorder">
                 </div>
 
                 <div>
                   <label class="block text-sm font-medium text-gray-400 mb-2">Opacidad Fondo: {{ currentConfig.card.overlayOpacity }}%</label>
                   <input type="range" v-model.number="currentConfig.card.overlayOpacity" min="0" max="100" class="w-full accent-discord">
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-400 mb-2">Tamaño Titulo: {{ currentConfig.card.titleSize || 28 }}px</label>
+                  <input type="range" v-model.number="currentConfig.card.titleSize" min="14" max="60" class="w-full accent-discord">
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-400 mb-2">Tamaño Username: {{ currentConfig.card.usernameSize || 20 }}px</label>
+                  <input type="range" v-model.number="currentConfig.card.usernameSize" min="10" max="40" class="w-full accent-discord">
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-400 mb-2">Tamaño Subtitulo: {{ currentConfig.card.subtitleSize || 15 }}px</label>
+                  <input type="range" v-model.number="currentConfig.card.subtitleSize" min="10" max="40" class="w-full accent-discord">
                 </div>
 
                 <div class="flex items-center justify-between p-3 bg-dark-700 rounded-xl">
@@ -499,6 +576,137 @@
                 <div v-else class="w-full h-40 bg-dark-600 rounded-lg flex items-center justify-center border border-gray-700">
                   <p class="text-gray-500 text-sm">Activa la card para ver preview</p>
                 </div>
+
+                <!-- Scrubber global: recorre todo el timeline de la tarjeta -->
+                <div v-if="currentConfig.card.enabled" class="mt-4 pt-4 border-t border-gray-700">
+                  <label class="block text-xs text-gray-400 mb-2">
+                    Timeline: {{ (animFrame * (currentConfig.card.animationDelay || 100) / 1000).toFixed(2) }}s
+                    <span class="text-gray-600">/ {{ ((currentConfig.card.animationFrames || 30) * (currentConfig.card.animationDelay || 100) / 1000).toFixed(2) }}s</span>
+                  </label>
+                  <input type="range" v-model.number="animFrame" :min="0" :max="animMaxFrame" step="1" class="w-full accent-discord">
+                  <p class="text-[11px] text-gray-600 mt-1">Arrastra para ver cualquier instante (también funciona con el borrador del editor).</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- ANIMACIÓN DE TEXTOS -->
+            <div v-if="currentConfig.card.enabled" class="mt-8 border-t border-gray-800 pt-6">
+              <div class="flex items-center justify-between mb-4">
+                <div>
+                  <h4 class="font-semibold text-base">Animación de textos</h4>
+                  <p class="text-xs text-gray-500">Entrada → bucle → salida. Todo se ve en la preview de arriba.</p>
+                </div>
+                <button @click="animEditorOpen = !animEditorOpen" class="text-xs px-3 py-1.5 rounded-lg border border-gray-700 hover:border-discord text-gray-400 hover:text-white transition-colors">
+                  {{ animEditorOpen ? 'Cerrar editor' : 'Editor de keyframes' }}
+                </button>
+              </div>
+
+              <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div v-for="el in animElements" :key="el.id" class="bg-dark-700/60 rounded-xl p-4 border border-gray-800">
+                  <p class="text-sm font-medium mb-3">{{ el.label }}</p>
+                  <div v-for="ph in animPhases" :key="ph.id" class="mb-3 last:mb-0">
+                    <div class="flex items-center justify-between mb-1">
+                      <label class="text-xs text-gray-400">{{ ph.label }}</label>
+                      <button @click="openAnimEditor(el.id, ph.id)" class="text-[11px] text-discord hover:text-white transition-colors">Editar</button>
+                    </div>
+                    <div class="flex gap-2">
+                      <select
+                        :value="currentConfig.card.textAnimations[el.id][ph.id].id"
+                        @change="currentConfig.card.textAnimations[el.id][ph.id].id = $event.target.value; onAnimPhaseChange(el.id, ph.id)"
+                        class="flex-1 min-w-0 bg-dark-800 border border-gray-700 rounded-lg px-2 py-2 text-xs focus:border-discord focus:outline-none"
+                      >
+                        <option value="none">Ninguna</option>
+                        <optgroup label="Presets">
+                          <option v-for="p in animationPresets" :key="p.id" :value="p.id">{{ p.name }}</option>
+                        </optgroup>
+                        <optgroup v-if="cardAnimations.length" label="Mis animaciones">
+                          <option v-for="a in cardAnimations" :key="a.id" :value="a.id">{{ a.name }}</option>
+                        </optgroup>
+                      </select>
+                      <input
+                        type="number" min="0" max="3" step="0.1"
+                        v-model.number="currentConfig.card.textAnimations[el.id][ph.id].duration"
+                        @change="previewAnimDraft()"
+                        class="w-16 bg-dark-800 border border-gray-700 rounded-lg px-2 py-2 text-xs focus:border-discord focus:outline-none"
+                        title="Duración en segundos"
+                      >
+                    </div>
+                    <label class="flex items-center gap-1.5 mt-1.5 text-[11px] text-gray-500 cursor-pointer">
+                      <input type="checkbox" v-model="currentConfig.card.textAnimations[el.id][ph.id].reverse" @change="previewAnimDraft()" class="accent-discord">
+                      Invertir (salida)
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <!-- EDITOR DE KEYFRAMES -->
+              <div v-if="animEditorOpen" class="mt-5 bg-dark-800 rounded-xl p-5 border border-gray-700 space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label class="block text-xs text-gray-400 mb-1">Elemento</label>
+                    <select v-model="animEditor.element" @change="openAnimEditor(animEditor.element, animEditor.phase)" class="w-full bg-dark-700 border border-gray-700 rounded-lg px-3 py-2 text-sm">
+                      <option v-for="el in animElements" :key="el.id" :value="el.id">{{ el.label }}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-400 mb-1">Fase</label>
+                    <select v-model="animEditor.phase" @change="openAnimEditor(animEditor.element, animEditor.phase)" class="w-full bg-dark-700 border border-gray-700 rounded-lg px-3 py-2 text-sm">
+                      <option v-for="ph in animPhases" :key="ph.id" :value="ph.id">{{ ph.label }}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-400 mb-1">Easing</label>
+                    <select v-model="animEditor.definition.easing" class="w-full bg-dark-700 border border-gray-700 rounded-lg px-3 py-2 text-sm">
+                      <option v-for="e in ['linear','easeIn','easeOut','easeInOut','easeOutCubic','easeOutBack','bounce','elastic']" :key="e" :value="e">{{ e }}</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <div class="flex items-center justify-between mb-2">
+                    <label class="text-xs text-gray-400">Keyframes (0 = inicio, 1 = fin)</label>
+                    <button @click="addKeyframe" class="text-xs text-discord hover:text-white">+ Añadir</button>
+                  </div>
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-xs min-w-[560px]">
+                      <thead class="text-gray-500">
+                        <tr>
+                          <th class="text-left py-1">At</th><th>Opacidad</th><th>X</th><th>Y</th><th>Escala</th><th>Rot.</th><th>Car.</th><th>Reveal</th><th></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="(kf, i) in animEditor.definition.keyframes" :key="i" class="text-center">
+                          <td class="py-1"><input type="number" v-model.number="kf.at" min="0" max="1" step="0.05" class="w-14 bg-dark-700 border border-gray-700 rounded px-1 py-1"></td>
+                          <td><input type="number" v-model.number="kf.opacity" min="0" max="1" step="0.05" class="w-14 bg-dark-700 border border-gray-700 rounded px-1 py-1"></td>
+                          <td><input type="number" v-model.number="kf.x" step="5" class="w-14 bg-dark-700 border border-gray-700 rounded px-1 py-1"></td>
+                          <td><input type="number" v-model.number="kf.y" step="5" class="w-14 bg-dark-700 border border-gray-700 rounded px-1 py-1"></td>
+                          <td><input type="number" v-model.number="kf.scale" min="0" step="0.05" class="w-14 bg-dark-700 border border-gray-700 rounded px-1 py-1"></td>
+                          <td><input type="number" v-model.number="kf.rotate" step="15" class="w-14 bg-dark-700 border border-gray-700 rounded px-1 py-1"></td>
+                          <td><input type="number" v-model.number="kf.chars" min="0" max="1" step="0.1" class="w-14 bg-dark-700 border border-gray-700 rounded px-1 py-1"></td>
+                          <td><input type="number" v-model.number="kf.reveal" min="0" max="1" step="0.1" class="w-14 bg-dark-700 border border-gray-700 rounded px-1 py-1"></td>
+                          <td><button @click="removeKeyframe(i)" :disabled="animEditor.definition.keyframes.length <= 2" class="text-accent-red hover:text-red-400 disabled:opacity-30">×</button></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2 border-t border-gray-700 pt-4">
+                  <input v-model="newAnimName" placeholder="Nombre para guardar…" class="flex-1 min-w-[180px] bg-dark-700 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-discord focus:outline-none">
+                  <button @click="saveCardAnimation(false)" :disabled="animSaving" class="bg-discord hover:bg-discord-hover px-4 py-2 rounded-lg text-sm disabled:opacity-50">Guardar como…</button>
+                  <button v-if="animEditor.selectedId.startsWith('anim_')" @click="saveCardAnimation(true)" :disabled="animSaving" class="bg-dark-600 hover:bg-dark-500 px-4 py-2 rounded-lg text-sm disabled:opacity-50">Actualizar</button>
+                  <button @click="previewAnimDraft()" class="bg-dark-600 hover:bg-dark-500 px-4 py-2 rounded-lg text-sm">Ver en frame</button>
+                </div>
+
+                <div v-if="cardAnimations.length" class="border-t border-gray-700 pt-4">
+                  <p class="text-xs text-gray-400 mb-2">Mis animaciones (disponibles en todos los servidores)</p>
+                  <div class="space-y-1.5">
+                    <div v-for="a in cardAnimations" :key="a.id" class="flex items-center justify-between bg-dark-700 rounded-lg px-3 py-2">
+                      <button @click="applySavedAnimation(a)" class="text-sm text-left hover:text-discord">{{ a.name }}</button>
+                      <button @click="deleteCardAnim(a.id)" class="text-xs text-accent-red hover:text-red-400">Borrar</button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -509,8 +717,8 @@
           <div class="bg-card rounded-2xl p-6 border border-gray-800">
             <div class="flex items-center justify-between mb-6">
               <div>
-                <h3 class="font-semibold text-lg">Auto-Role</h3>
-                <p class="text-sm text-gray-500">Asigna un rol automaticamente a nuevos miembros</p>
+                <h3 class="font-semibold text-lg">Roles Inteligentes</h3>
+                <p class="text-sm text-gray-500">Sistema de roles automaticos, milestones y reaction roles</p>
               </div>
               <div class="flex items-center gap-3">
                 <span v-if="saving" class="text-xs text-gray-500 flex items-center gap-1">
@@ -523,16 +731,467 @@
                 </label>
               </div>
             </div>
+
+            <!-- Tabs -->
             <div v-if="autoRoleConfig.enabled" class="space-y-4">
-              <div>
-                <label class="block text-sm font-medium text-gray-400 mb-2">Rol a asignar</label>
-                <select v-model="autoRoleConfig.roleId" class="w-full bg-dark-700 border border-gray-700 rounded-xl px-4 py-3 text-sm focus:border-discord focus:outline-none transition-colors">
-                  <option value="">Selecciona un rol</option>
-                  <option v-for="role in roles" :key="role.id" :value="role.id">{{ role.name }}</option>
-                </select>
+              <div class="flex gap-2 border-b border-gray-700 pb-2">
+                <button @click="autoRoleTab = 'basic'" :class="autoRoleTab === 'basic' ? 'bg-discord text-white' : 'bg-dark-700 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all">Basico</button>
+                <button @click="autoRoleTab = 'smart'" :class="autoRoleTab === 'smart' ? 'bg-discord text-white' : 'bg-dark-700 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all">Inteligente</button>
+                <button @click="autoRoleTab = 'milestones'" :class="autoRoleTab === 'milestones' ? 'bg-discord text-white' : 'bg-dark-700 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all">Milestones</button>
+                <button @click="autoRoleTab = 'reactions'" :class="autoRoleTab === 'reactions' ? 'bg-discord text-white' : 'bg-dark-700 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all">Reaction Roles</button>
               </div>
+
+              <!-- TAB: Basico -->
+              <div v-if="autoRoleTab === 'basic'" class="space-y-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-400 mb-2">Rol para todos los miembros</label>
+                  <select v-model="autoRoleConfig.roleId" class="w-full bg-dark-700 border border-gray-700 rounded-xl px-4 py-3 text-sm focus:border-discord focus:outline-none transition-colors">
+                    <option value="">Ninguno</option>
+                    <option v-for="role in roles" :key="role.id" :value="role.id">{{ role.name }}</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- TAB: Inteligente -->
+              <div v-if="autoRoleTab === 'smart'" class="space-y-4">
+                <div class="flex items-center justify-between p-3 bg-dark-700 rounded-xl">
+                  <div>
+                    <p class="text-sm font-medium">Rol para Bots</p>
+                    <p class="text-xs text-gray-500">Se asigna automaticamente a bots que entren</p>
+                  </div>
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" v-model="autoRoleConfig.botRole.enabled" class="sr-only peer">
+                    <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent-green"></div>
+                  </label>
+                </div>
+                <div v-if="autoRoleConfig.botRole.enabled">
+                  <label class="block text-sm font-medium text-gray-400 mb-2">Rol de Bot</label>
+                  <select v-model="autoRoleConfig.botRole.roleId" class="w-full bg-dark-700 border border-gray-700 rounded-xl px-4 py-3 text-sm focus:border-discord focus:outline-none transition-colors">
+                    <option value="">Selecciona un rol</option>
+                    <option v-for="role in roles" :key="role.id" :value="role.id">{{ role.name }}</option>
+                  </select>
+                </div>
+
+                <div class="flex items-center justify-between p-3 bg-dark-700 rounded-xl">
+                  <div>
+                    <p class="text-sm font-medium">Rol para Boosters</p>
+                    <p class="text-xs text-gray-500">Se asigna cuando alguien boostea el servidor</p>
+                  </div>
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" v-model="autoRoleConfig.boostRole.enabled" class="sr-only peer">
+                    <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent-green"></div>
+                  </label>
+                </div>
+                <div v-if="autoRoleConfig.boostRole.enabled">
+                  <label class="block text-sm font-medium text-gray-400 mb-2">Rol de Booster</label>
+                  <select v-model="autoRoleConfig.boostRole.roleId" class="w-full bg-dark-700 border border-gray-700 rounded-xl px-4 py-3 text-sm focus:border-discord focus:outline-none transition-colors">
+                    <option value="">Selecciona un rol</option>
+                    <option v-for="role in roles" :key="role.id" :value="role.id">{{ role.name }}</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- TAB: Milestones -->
+              <div v-if="autoRoleTab === 'milestones'" class="space-y-4">
+                <p class="text-xs text-gray-500">Roles para los primeros N miembros. Se desactiva automaticamente al alcanzar la meta.</p>
+                <div v-for="(ms, i) in autoRoleConfig.milestones" :key="i" class="bg-dark-700 rounded-xl p-4 space-y-3 border border-gray-700">
+                  <div class="flex items-center justify-between">
+                    <span class="text-sm font-medium">Milestone #{{ i + 1 }}</span>
+                    <div class="flex items-center gap-2">
+                      <span v-if="ms.completed" class="text-xs bg-accent-green/20 text-accent-green px-2 py-0.5 rounded-full">Completado</span>
+                      <button @click="autoRoleConfig.milestones.splice(i, 1)" class="text-accent-red hover:text-red-400 text-xs">Eliminar</button>
+                    </div>
+                  </div>
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label class="block text-xs text-gray-400 mb-1">Rol</label>
+                      <select v-model="ms.roleId" class="w-full bg-dark-600 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-discord focus:outline-none">
+                        <option value="">Selecciona un rol</option>
+                        <option v-for="role in roles" :key="role.id" :value="role.id">{{ role.name }}</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-gray-400 mb-1">Max Miembros</label>
+                      <input type="number" v-model.number="ms.maxMembers" min="1" class="w-full bg-dark-600 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-discord focus:outline-none">
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-400 mb-1">Canal de Aviso</label>
+                    <select v-model="ms.announceChannel" class="w-full bg-dark-600 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-discord focus:outline-none">
+                      <option value="">Ninguno</option>
+                      <option v-for="ch in channels" :key="ch.id" :value="ch.id">#{{ ch.name }}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-400 mb-1">Mensaje de Aviso</label>
+                    <input v-model="ms.announceMessage" placeholder="Meta alcanzada! Ya no se asignara este rol." class="w-full bg-dark-600 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-discord focus:outline-none">
+                  </div>
+                  <div class="flex items-center justify-between p-2 bg-dark-600 rounded-lg">
+                    <span class="text-xs text-gray-400">Habilitado</span>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" v-model="ms.enabled" class="sr-only peer">
+                      <div class="w-8 h-4 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-accent-green"></div>
+                    </label>
+                  </div>
+                </div>
+                <button @click="autoRoleConfig.milestones.push({ id: Date.now().toString(36), enabled: true, roleId: '', maxMembers: 100, announceChannel: '', announceMessage: '', announceEmbed: { title: 'Meta alcanzada', color: '#5865F2' }, completed: false })" class="w-full bg-dark-700 hover:bg-dark-600 border border-dashed border-gray-700 rounded-xl px-4 py-3 text-sm text-gray-400 hover:text-white transition-all">
+                  + Agregar Milestone
+                </button>
+              </div>
+
+              <!-- TAB: Reaction Roles -->
+              <div v-if="autoRoleTab === 'reactions'" class="space-y-4">
+                <p class="text-xs text-gray-500">Roles que los usuarios eligen reaccionando o con un menu desplegable.</p>
+                <div v-for="(rr, i) in autoRoleConfig.reactionRoles" :key="i" class="bg-dark-700 rounded-xl p-4 space-y-3 border border-gray-700">
+                  <div class="flex items-center justify-between">
+                    <span class="text-sm font-medium">Reaction Role #{{ i + 1 }}</span>
+                    <div class="flex items-center gap-2">
+                      <span v-if="rr.messageId" class="text-xs bg-accent-green/20 text-accent-green px-2 py-0.5 rounded-full">Enviado</span>
+                      <button @click="autoRoleConfig.reactionRoles.splice(i, 1)" class="text-accent-red hover:text-red-400 text-xs">Eliminar</button>
+                    </div>
+                  </div>
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label class="block text-xs text-gray-400 mb-1">Canal</label>
+                      <select v-model="rr.channelId" class="w-full bg-dark-600 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-discord focus:outline-none">
+                        <option value="">Selecciona un canal</option>
+                        <option v-for="ch in channels" :key="ch.id" :value="ch.id">#{{ ch.name }}</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-gray-400 mb-1">Modo</label>
+                      <select v-model="rr.mode" class="w-full bg-dark-600 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-discord focus:outline-none">
+                        <option value="emoji">Emoji (reaccionar)</option>
+                        <option value="select">Menu desplegable</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-400 mb-1">Titulo del Embed</label>
+                    <input v-model="rr.embed.title" placeholder="Elige tu rol" class="w-full bg-dark-600 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-discord focus:outline-none">
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-400 mb-1">Descripcion del Embed</label>
+                    <textarea v-model="rr.embed.description" rows="2" placeholder="Reacciona para obtener tu rol" class="w-full bg-dark-600 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-discord focus:outline-none resize-none"></textarea>
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-400 mb-1">Color del Embed</label>
+                    <input type="color" v-model="rr.embed.color" class="w-10 h-8 rounded-lg cursor-pointer">
+                  </div>
+                  <div class="space-y-2">
+                    <label class="block text-xs text-gray-400">Roles</label>
+                    <div v-for="(r, ri) in rr.roles" :key="ri" class="flex items-center gap-2">
+                      <input v-model="r.emoji" placeholder="Emoji" class="w-16 bg-dark-600 border border-gray-700 rounded-lg px-2 py-1.5 text-sm text-center focus:border-discord focus:outline-none">
+                      <select v-model="r.roleId" class="flex-1 bg-dark-600 border border-gray-700 rounded-lg px-2 py-1.5 text-sm focus:border-discord focus:outline-none">
+                        <option value="">Rol</option>
+                        <option v-for="role in roles" :key="role.id" :value="role.id">{{ role.name }}</option>
+                      </select>
+                      <input v-model="r.label" placeholder="Label" class="w-24 bg-dark-600 border border-gray-700 rounded-lg px-2 py-1.5 text-sm focus:border-discord focus:outline-none">
+                      <button @click="rr.roles.splice(ri, 1)" class="text-accent-red hover:text-red-400 text-xs">X</button>
+                    </div>
+                    <button @click="rr.roles.push({ emoji: '', roleId: '', label: '' })" class="text-xs text-discord hover:text-discord-hover transition-colors">+ Agregar rol</button>
+                  </div>
+                  <div class="flex gap-2">
+                    <button @click="sendReactionRole(i)" :disabled="!rr.channelId || rr.roles.length === 0" class="bg-discord hover:bg-discord-hover px-4 py-2 rounded-lg text-xs font-medium transition-all disabled:opacity-50">
+                      {{ rr.messageId ? 'Reenviar Mensaje' : 'Enviar Mensaje' }}
+                    </button>
+                    <div class="flex items-center justify-between flex-1 p-2 bg-dark-600 rounded-lg">
+                      <span class="text-xs text-gray-400">Habilitado</span>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" v-model="rr.enabled" class="sr-only peer">
+                        <div class="w-8 h-4 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-accent-green"></div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                <button @click="autoRoleConfig.reactionRoles.push({ id: Date.now().toString(36), enabled: true, channelId: '', messageId: '', mode: 'emoji', embed: { title: 'Elige tu rol', description: 'Reacciona para obtener tu rol', color: '#5865F2' }, roles: [] })" class="w-full bg-dark-700 hover:bg-dark-600 border border-dashed border-gray-700 rounded-xl px-4 py-3 text-sm text-gray-400 hover:text-white transition-all">
+                  + Agregar Reaction Role
+                </button>
+              </div>
+
               <button @click="saveAutoRole" :disabled="saving" class="bg-discord hover:bg-discord-hover px-6 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 disabled:opacity-50">
                 Guardar Auto-Role
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- NIVELES -->
+        <div v-if="currentPage === 'levels' && selectedGuild" class="max-w-5xl space-y-6">
+          <div class="bg-card rounded-2xl p-6 border border-gray-800">
+            <div class="flex items-center justify-between mb-6">
+              <div>
+                <h3 class="font-semibold text-lg">Sistema de Niveles</h3>
+                <p class="text-sm text-gray-500">XP, niveles, logros y ranking del servidor</p>
+              </div>
+              <div class="flex items-center gap-3">
+                <span v-if="saving" class="text-xs text-gray-500 flex items-center gap-1">
+                  <svg class="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                  Guardando...
+                </span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" v-model="levelsConfig.enabled" @change="saveLevels" class="sr-only peer">
+                  <div class="w-11 h-6 bg-dark-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-discord"></div>
+                </label>
+              </div>
+            </div>
+
+            <div v-if="levelsConfig.enabled" class="space-y-4">
+              <div class="flex gap-2 border-b border-gray-700 pb-2">
+                <button @click="levelsTab = 'general'" :class="levelsTab === 'general' ? 'bg-discord text-white' : 'bg-dark-700 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all">General</button>
+                <button @click="levelsTab = 'multipliers'" :class="levelsTab === 'multipliers' ? 'bg-discord text-white' : 'bg-dark-700 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all">Multiplicadores</button>
+                <button @click="levelsTab = 'levelroles'" :class="levelsTab === 'levelroles' ? 'bg-discord text-white' : 'bg-dark-700 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all">Roles por Nivel</button>
+                <button @click="levelsTab = 'icons'" :class="levelsTab === 'icons' ? 'bg-discord text-white' : 'bg-dark-700 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all">Iconos</button>
+                <button @click="levelsTab = 'achievements'" :class="levelsTab === 'achievements' ? 'bg-discord text-white' : 'bg-dark-700 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all">Logros</button>
+                <button @click="levelsTab = 'commands'" :class="levelsTab === 'commands' ? 'bg-discord text-white' : 'bg-dark-700 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all">Comandos</button>
+                <button @click="levelsTab = 'ranking'" :class="levelsTab === 'ranking' ? 'bg-discord text-white' : 'bg-dark-700 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all">Ranking</button>
+              </div>
+
+              <!-- TAB: General -->
+              <div v-if="levelsTab === 'general'" class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">XP Minimo por mensaje</label>
+                    <input type="number" v-model.number="levelsConfig.xpPerMessage.min" min="1" class="w-full bg-dark-700 border border-gray-700 rounded-xl px-4 py-3 text-sm focus:border-discord focus:outline-none transition-colors">
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">XP Maximo por mensaje</label>
+                    <input type="number" v-model.number="levelsConfig.xpPerMessage.max" min="1" class="w-full bg-dark-700 border border-gray-700 rounded-xl px-4 py-3 text-sm focus:border-discord focus:outline-none transition-colors">
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-400 mb-2">Cooldown de XP: {{ levelsConfig.xpCooldown }}s</label>
+                  <input type="range" v-model.number="levelsConfig.xpCooldown" min="5" max="300" class="w-full accent-discord">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-400 mb-2">Cooldown de mensajes: {{ levelsConfig.messageCooldown }}s <span class="text-xs text-gray-500">(0 = siempre contar)</span></label>
+                  <input type="range" v-model.number="levelsConfig.messageCooldown" min="0" max="300" class="w-full accent-discord">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">Base de formula</label>
+                    <input type="number" v-model.number="levelsConfig.levelFormula.base" min="10" class="w-full bg-dark-700 border border-gray-700 rounded-xl px-4 py-3 text-sm focus:border-discord focus:outline-none transition-colors">
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">Exponente</label>
+                    <input type="number" v-model.number="levelsConfig.levelFormula.exponent" min="0.5" max="5" step="0.1" class="w-full bg-dark-700 border border-gray-700 rounded-xl px-4 py-3 text-sm focus:border-discord focus:outline-none transition-colors">
+                  </div>
+                </div>
+                <div class="bg-dark-700 rounded-xl p-3 text-xs text-gray-400">
+                  Vista previa: Nivel 5 = {{ Math.floor(levelsConfig.levelFormula.base * Math.pow(5, levelsConfig.levelFormula.exponent)) }} XP | Nivel 10 = {{ Math.floor(levelsConfig.levelFormula.base * Math.pow(10, levelsConfig.levelFormula.exponent)) }} XP | Nivel 25 = {{ Math.floor(levelsConfig.levelFormula.base * Math.pow(25, levelsConfig.levelFormula.exponent)) }} XP
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-400 mb-2">Canal de anuncios</label>
+                  <select v-model="levelsConfig.announcementChannel" class="w-full bg-dark-700 border border-gray-700 rounded-xl px-4 py-3 text-sm focus:border-discord focus:outline-none transition-colors">
+                    <option value="">Mismo canal del mensaje</option>
+                    <option v-for="ch in channels" :key="ch.id" :value="ch.id">#{{ ch.name }}</option>
+                  </select>
+                </div>
+                <div class="flex items-center justify-between p-3 bg-dark-700 rounded-xl">
+                  <div>
+                    <p class="text-sm font-medium">Anunciar subida de nivel</p>
+                    <p class="text-xs text-gray-500">Envia un mensaje cuando alguien sube de nivel</p>
+                  </div>
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" v-model="levelsConfig.announceLevelUp" class="sr-only peer">
+                    <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent-green"></div>
+                  </label>
+                </div>
+                <div class="flex items-center justify-between p-3 bg-dark-700 rounded-xl">
+                  <div>
+                    <p class="text-sm font-medium">Anunciar logros</p>
+                    <p class="text-xs text-gray-500">Envia un mensaje cuando alguien desbloquea un logro</p>
+                  </div>
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" v-model="levelsConfig.announceAchievement" class="sr-only peer">
+                    <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent-green"></div>
+                  </label>
+                </div>
+
+                <div class="border-t border-gray-700 pt-4 mt-4">
+                  <label class="block text-sm font-medium text-gray-400 mb-2">Canales bloqueados (sin XP ni anuncios)</label>
+                  <p class="text-xs text-gray-500 mb-3">En estos canales no se gana XP y no se anuncian subidas de nivel.</p>
+                  <div v-for="(chId, i) in levelsConfig.ignoredChannels" :key="i" class="flex items-center gap-2 mb-2">
+                    <select v-model="levelsConfig.ignoredChannels[i]" class="flex-1 bg-dark-700 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-discord focus:outline-none">
+                      <option value="">Selecciona un canal</option>
+                      <option v-for="ch in channels" :key="ch.id" :value="ch.id">#{{ ch.name }}</option>
+                    </select>
+                    <button @click="levelsConfig.ignoredChannels.splice(i, 1)" class="text-accent-red hover:text-red-400 text-xs">X</button>
+                  </div>
+                  <button @click="levelsConfig.ignoredChannels.push('')" class="w-full bg-dark-700 hover:bg-dark-600 border border-dashed border-gray-700 rounded-xl px-4 py-3 text-sm text-gray-400 hover:text-white transition-all">
+                    + Agregar canal bloqueado
+                  </button>
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-400 mb-2">Titulo minimo para cambiar titulo: Nivel {{ levelsConfig.titleMinLevel }}</label>
+                  <input type="range" v-model.number="levelsConfig.titleMinLevel" min="1" max="50" class="w-full accent-discord">
+                </div>
+              </div>
+
+              <!-- TAB: Multiplicadores -->
+              <div v-if="levelsTab === 'multipliers'" class="space-y-4">
+                <p class="text-xs text-gray-500">Multiplicadores de XP por canal especifico.</p>
+                <div v-for="(cm, i) in levelsConfig.channelMultipliers" :key="i" class="flex items-center gap-3 bg-dark-700 rounded-xl p-3">
+                  <select v-model="cm.channelId" class="flex-1 bg-dark-600 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-discord focus:outline-none">
+                    <option value="">Canal</option>
+                    <option v-for="ch in channels" :key="ch.id" :value="ch.id">#{{ ch.name }}</option>
+                  </select>
+                  <input type="number" v-model.number="cm.multiplier" min="0.1" max="10" step="0.1" class="w-20 bg-dark-600 border border-gray-700 rounded-lg px-3 py-2 text-sm text-center focus:border-discord focus:outline-none">
+                  <span class="text-xs text-gray-500">x</span>
+                  <button @click="levelsConfig.channelMultipliers.splice(i, 1)" class="text-accent-red hover:text-red-400 text-xs">X</button>
+                </div>
+                <button @click="levelsConfig.channelMultipliers.push({ channelId: '', multiplier: 2.0 })" class="w-full bg-dark-700 hover:bg-dark-600 border border-dashed border-gray-700 rounded-xl px-4 py-3 text-sm text-gray-400 hover:text-white transition-all">
+                  + Agregar multiplicador de canal
+                </button>
+
+                <div class="border-t border-gray-700 pt-4 mt-4">
+                  <div class="flex items-center justify-between p-3 bg-dark-700 rounded-xl">
+                    <div>
+                      <p class="text-sm font-medium">Multiplicador de Racha</p>
+                      <p class="text-xs text-gray-500">Bonus por dias consecutivos hablando</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" v-model="levelsConfig.streakMultiplier.enabled" class="sr-only peer">
+                      <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent-green"></div>
+                    </label>
+                  </div>
+                  <div v-if="levelsConfig.streakMultiplier.enabled" class="grid grid-cols-2 gap-3 mt-3">
+                    <div>
+                      <label class="block text-xs text-gray-400 mb-1">Bonus diario: +{{ (levelsConfig.streakMultiplier.dailyBonus * 100).toFixed(0) }}%</label>
+                      <input type="range" v-model.number="levelsConfig.streakMultiplier.dailyBonus" min="0.01" max="0.5" step="0.01" class="w-full accent-discord">
+                    </div>
+                    <div>
+                      <label class="block text-xs text-gray-400 mb-1">Maximo: x{{ levelsConfig.streakMultiplier.maxMultiplier }}</label>
+                      <input type="range" v-model.number="levelsConfig.streakMultiplier.maxMultiplier" min="1.5" max="5" step="0.1" class="w-full accent-discord">
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- TAB: Roles por Nivel -->
+              <div v-if="levelsTab === 'levelroles'" class="space-y-4">
+                <p class="text-xs text-gray-500">Asigna roles automaticamente al alcanzar un nivel.</p>
+                <div v-for="(lr, i) in levelsConfig.levelRoles" :key="i" class="flex items-center gap-3 bg-dark-700 rounded-xl p-3">
+                  <span class="text-sm text-gray-400 w-16">Nivel {{ lr.level }}</span>
+                  <select v-model="lr.roleId" class="flex-1 bg-dark-600 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-discord focus:outline-none">
+                    <option value="">Selecciona un rol</option>
+                    <option v-for="role in roles" :key="role.id" :value="role.id">{{ role.name }}</option>
+                  </select>
+                  <input type="number" v-model.number="lr.level" min="1" max="999" class="w-20 bg-dark-600 border border-gray-700 rounded-lg px-3 py-2 text-sm text-center focus:border-discord focus:outline-none">
+                  <label class="flex items-center gap-1 text-xs text-gray-400">
+                    <input type="checkbox" v-model="lr.removePrevious" class="rounded"> Quitar anterior
+                  </label>
+                  <button @click="levelsConfig.levelRoles.splice(i, 1)" class="text-accent-red hover:text-red-400 text-xs">X</button>
+                </div>
+                <button @click="levelsConfig.levelRoles.push({ level: 5, roleId: '', removePrevious: true })" class="w-full bg-dark-700 hover:bg-dark-600 border border-dashed border-gray-700 rounded-xl px-4 py-3 text-sm text-gray-400 hover:text-white transition-all">
+                  + Agregar rol por nivel
+                </button>
+              </div>
+
+              <!-- TAB: Iconos -->
+              <div v-if="levelsTab === 'icons'" class="space-y-4">
+                <p class="text-xs text-gray-500">Iconos de rango que se muestran segun el nivel. Puedes usar emojis, imagenes o emotes del servidor.</p>
+                <div v-for="(ic, i) in levelsConfig.icons" :key="i" class="flex items-center gap-3 bg-dark-700 rounded-xl p-3">
+                  <input v-model="ic.icon" placeholder="Icono (emoji, URL o emote)" class="w-32 bg-dark-600 border border-gray-700 rounded-lg px-3 py-2 text-sm text-center focus:border-discord focus:outline-none">
+                  <input v-model="ic.label" placeholder="Label" class="w-32 bg-dark-600 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-discord focus:outline-none">
+                  <span class="text-xs text-gray-500">Nivel minimo:</span>
+                  <input type="number" v-model.number="ic.minLevel" min="1" max="999" class="w-20 bg-dark-600 border border-gray-700 rounded-lg px-3 py-2 text-sm text-center focus:border-discord focus:outline-none">
+                  <button @click="levelsConfig.icons.splice(i, 1)" class="text-accent-red hover:text-red-400 text-xs">X</button>
+                </div>
+                <button @click="levelsConfig.icons.push({ minLevel: 1, icon: '🌱', label: 'Novato' })" class="w-full bg-dark-700 hover:bg-dark-600 border border-dashed border-gray-700 rounded-xl px-4 py-3 text-sm text-gray-400 hover:text-white transition-all">
+                  + Agregar icono
+                </button>
+              </div>
+
+              <!-- TAB: Logros -->
+              <div v-if="levelsTab === 'achievements'" class="space-y-4">
+                <p class="text-xs text-gray-500">Logros que los usuarios pueden desbloquear.</p>
+                <div v-for="(ach, i) in levelsConfig.achievements" :key="i" class="bg-dark-700 rounded-xl p-3 space-y-2">
+                  <div class="flex items-center justify-between">
+                    <span class="text-sm font-medium">{{ ach.icon }} {{ ach.name }}</span>
+                    <button @click="levelsConfig.achievements.splice(i, 1)" class="text-accent-red hover:text-red-400 text-xs">Eliminar</button>
+                  </div>
+                  <div class="grid grid-cols-4 gap-2">
+                    <input v-model="ach.icon" placeholder="Icono" class="bg-dark-600 border border-gray-700 rounded-lg px-2 py-1.5 text-sm focus:border-discord focus:outline-none">
+                    <input v-model="ach.name" placeholder="Nombre" class="bg-dark-600 border border-gray-700 rounded-lg px-2 py-1.5 text-sm focus:border-discord focus:outline-none">
+                    <select v-model="ach.type" class="bg-dark-600 border border-gray-700 rounded-lg px-2 py-1.5 text-sm focus:border-discord focus:outline-none">
+                      <option value="messages">Mensajes</option>
+                      <option value="level">Nivel</option>
+                    </select>
+                    <input type="number" v-model.number="ach.target" min="1" placeholder="Meta" class="bg-dark-600 border border-gray-700 rounded-lg px-2 py-1.5 text-sm focus:border-discord focus:outline-none">
+                  </div>
+                  <input v-model="ach.description" placeholder="Descripcion" class="w-full bg-dark-600 border border-gray-700 rounded-lg px-2 py-1.5 text-sm focus:border-discord focus:outline-none">
+                </div>
+                <button @click="levelsConfig.achievements.push({ id: Date.now().toString(36), icon: '🏆', name: 'Nuevo Logro', description: 'Descripcion', type: 'messages', target: 100 })" class="w-full bg-dark-700 hover:bg-dark-600 border border-dashed border-gray-700 rounded-xl px-4 py-3 text-sm text-gray-400 hover:text-white transition-all">
+                  + Agregar logro
+                </button>
+              </div>
+
+              <!-- TAB: Comandos -->
+              <div v-if="levelsTab === 'commands'" class="space-y-4">
+                <p class="text-xs text-gray-500">Habilita o deshabilita comandos de usuario del sistema de niveles.</p>
+                <div class="flex items-center justify-between p-3 bg-dark-700 rounded-xl">
+                  <div>
+                    <p class="text-sm font-medium">/rank</p>
+                    <p class="text-xs text-gray-500">Muestra nivel y XP</p>
+                  </div>
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" v-model="levelsConfig.commandsEnabled.rank" class="sr-only peer">
+                    <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent-green"></div>
+                  </label>
+                </div>
+                <div class="flex items-center justify-between p-3 bg-dark-700 rounded-xl">
+                  <div>
+                    <p class="text-sm font-medium">/leaderboard</p>
+                    <p class="text-xs text-gray-500">Ranking del servidor</p>
+                  </div>
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" v-model="levelsConfig.commandsEnabled.leaderboard" class="sr-only peer">
+                    <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent-green"></div>
+                  </label>
+                </div>
+                <div class="flex items-center justify-between p-3 bg-dark-700 rounded-xl">
+                  <div>
+                    <p class="text-sm font-medium">/profile</p>
+                    <p class="text-xs text-gray-500">Perfil social</p>
+                  </div>
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" v-model="levelsConfig.commandsEnabled.profile" class="sr-only peer">
+                    <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent-green"></div>
+                  </label>
+                </div>
+                <div class="flex items-center justify-between p-3 bg-dark-700 rounded-xl">
+                  <div>
+                    <p class="text-sm font-medium">/achievements</p>
+                    <p class="text-xs text-gray-500">Lista de logros</p>
+                  </div>
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" v-model="levelsConfig.commandsEnabled.achievements" class="sr-only peer">
+                    <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent-green"></div>
+                  </label>
+                </div>
+
+              </div>
+
+              <!-- TAB: Ranking -->
+              <div v-if="levelsTab === 'ranking'" class="space-y-4">
+                <p class="text-xs text-gray-500">Top 20 usuarios con mas XP del servidor.</p>
+                <div v-if="levelsLeaderboard.length === 0" class="text-center text-gray-500 py-8">No hay datos de nivel aun.</div>
+                <div v-for="(entry, i) in levelsLeaderboard" :key="entry.userId" class="flex items-center gap-3 bg-dark-700 rounded-xl p-3">
+                  <span class="text-lg font-bold w-8 text-center" :class="i < 3 ? 'text-yellow-400' : 'text-gray-500'">{{ i < 3 ? ['🥇','🥈','🥉'][i] : '#' + (i+1) }}</span>
+                  <div class="flex-1">
+                    <p class="text-sm font-medium">{{ entry.userId }}</p>
+                    <p class="text-xs text-gray-500">Nivel {{ entry.level }} | {{ entry.xp?.toLocaleString() }} XP | {{ entry.messages }} msgs</p>
+                  </div>
+                </div>
+                <button @click="loadLevelsLeaderboard" class="w-full bg-dark-700 hover:bg-dark-600 border border-gray-700 rounded-xl px-4 py-3 text-sm text-gray-400 hover:text-white transition-all">
+                  Refrescar ranking
+                </button>
+              </div>
+
+              <button @click="saveLevels" :disabled="saving" class="bg-discord hover:bg-discord-hover px-6 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 disabled:opacity-50">
+                Guardar Niveles
               </button>
             </div>
           </div>
@@ -613,7 +1272,7 @@
                   </div>
                   <div>
                     <label class="block text-xs text-gray-400 mb-1">Dominios permitidos (separados por coma)</label>
-                    <input type="text" v-model="automodConfig.antiLinks.whitelistedDomains" placeholder="youtube.com, twitch.tv, discord.gg" class="w-full bg-dark-600 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:border-discord focus:outline-none">
+                    <input type="text" v-model="automodConfig.whitelistedDomainsStr" placeholder="youtube.com, twitch.tv, discord.gg" class="w-full bg-dark-600 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:border-discord focus:outline-none">
                   </div>
                 </div>
               </div>
@@ -783,6 +1442,39 @@
               <button @click="saveDashboardConfig" class="bg-discord hover:bg-discord-hover px-6 py-2.5 rounded-xl text-sm font-medium transition-all duration-200">
                 Guardar Ajustes
               </button>
+            </div>
+          </div>
+
+          <!-- Servidores Autorizados -->
+          <div class="bg-card rounded-2xl p-6 border border-gray-800">
+            <div class="flex items-center justify-between mb-6">
+              <div>
+                <h3 class="font-semibold text-lg">Servidores Autorizados</h3>
+                <p class="text-sm text-gray-500">Controla en que servidores puede usar comandos el bot</p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" :checked="authorizedFilter" @change="toggleAuthFilter($event.target.checked)" class="sr-only peer">
+                <div class="w-11 h-6 bg-dark-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-discord"></div>
+              </label>
+            </div>
+            <p v-if="!authorizedFilter" class="text-xs text-gray-500 mb-4">Modo libre: el bot responde en todos los servidores. Activa el filtro para elegir manualmente.</p>
+            <p v-else class="text-xs text-green-400 mb-4">Filtro activo: solo los servidores marcados pueden usar comandos.</p>
+            <div class="space-y-2">
+              <div v-for="s in authorizedServers" :key="s.id" class="flex items-center justify-between p-3 bg-dark-700 rounded-xl border border-gray-700">
+                <div class="flex items-center gap-3">
+                  <img v-if="s.icon" :src="s.icon" class="w-8 h-8 rounded-full">
+                  <div v-else class="w-8 h-8 rounded-full bg-dark-500 flex items-center justify-center text-xs font-bold">{{ s.name.charAt(0) }}</div>
+                  <div>
+                    <p class="font-medium text-sm">{{ s.name }}</p>
+                    <p class="text-xs text-gray-500">{{ s.memberCount }} miembros</p>
+                  </div>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" :checked="s.authorized" @change="toggleServerAuth(s.id, $event.target.checked)" class="sr-only peer">
+                  <div class="w-11 h-6 bg-dark-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                </label>
+              </div>
+              <p v-if="authorizedServers.length === 0" class="text-xs text-gray-500 text-center py-4">No se encontraron servidores</p>
             </div>
           </div>
         </div>

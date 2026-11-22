@@ -10,6 +10,9 @@ services:
     volumes:
       - ./src:/app/src
       - ./frontend:/app/frontend
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+      - ./backups:/app/backups
 
   watch:
     build: .
@@ -24,4 +27,7 @@ services:
     volumes:
       - ./src:/app/src
       - ./frontend:/app/frontend
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+      - ./backups:/app/backups
     command: npx nodemon src/index.js

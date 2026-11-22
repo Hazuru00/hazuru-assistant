@@ -29,6 +29,18 @@ module.exports = {
     // premiumSince es null si no está boosteando, y tiene fecha si empezó
     if (!oldMember.premiumSince && newMember.premiumSince) {
       const config = getGuild(guildId);
+
+      // Asignar boostRole si está configurado
+      const autoRole = config.autoRole || {};
+      if (autoRole.boostRole?.enabled && autoRole.boostRole.roleId) {
+        try {
+          const role = newMember.guild.roles.cache.get(autoRole.boostRole.roleId);
+          if (role) await newMember.roles.add(role);
+        } catch (e) {
+          logError(e, { event: 'guildMemberUpdate', guild: newMember.guild, user: newMember.user, section: 'boostRole', action: 'Assign boost role' });
+        }
+      }
+
       if (config.boost.enabled && config.boost.channel) {
         const channel = newMember.guild.channels.cache.get(config.boost.channel);
         if (channel) {

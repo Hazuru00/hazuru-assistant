@@ -10,7 +10,7 @@ RUN npm install --omit=dev
 
 COPY . .
 
-RUN mkdir -p logs uploads && chown -R node:node logs uploads
+RUN mkdir -p logs uploads uploads/fonts backups && chown -R node:node logs uploads backups
 
 USER node
 

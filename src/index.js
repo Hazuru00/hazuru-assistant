@@ -58,11 +58,26 @@ const multer = require('multer');       // Para subir imágenes
 // Imports de la base de datos local
 const { getGuild, updateGuild } = require('./database');
 const { getAllReminders, removeReminder } = require('./database/reminders');
+const { getSettings, updateSettings } = require('./database/settings');
+const { readJson, writeJsonAtomic } = require('./database/atomic');
+const {
+  listCardAnimations, getCardAnimation,
+  createCardAnimation, updateCardAnimation, removeCardAnimation,
+} = require('./database/cardAnimations');
 
 // Imports de utilidades
 const { logError, logInfo } = require('./utils/logger');
 const { replaceVars } = require('./utils/replaceVars');
 const { buildEmbed } = require('./utils/buildEmbed');
+const { listPresets } = require('./utils/textAnimations');
+
+// Asegurar que existan los directorios de uploads y logs
+const uploadsDir = path.join(__dirname, '..', 'uploads');
+const logsDir = path.join(__dirname, '..', 'logs');
+const fontsDir = path.join(uploadsDir, 'fonts');
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
+if (!fs.existsSync(fontsDir)) fs.mkdirSync(fontsDir, { recursive: true });
 
 
 // ============================================================================
@@ -88,6 +103,7 @@ const client = new Client({
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildVoiceStates,
     GatewayIntentBits.GuildBans,
+    GatewayIntentBits.DirectMessages,
   ],
 });
 
@@ -220,7 +236,75 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
     res.json({ url, filename: req.file.filename });
   } catch (e) {
     logError(e, { event: 'api/upload', action: 'Upload image' });
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Upload failed' });
+  }
+});
+
+// --- SUBIDA DE FONTS ---
+const fontStorage = multer.diskStorage({
+  destination: path.join(__dirname, '..', 'uploads', 'fonts'),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`);
+  },
+});
+const fontUpload = multer({
+  storage: fontStorage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = /\.(ttf|otf|woff|woff2)$/i;
+    const ext = allowed.test(path.extname(file.originalname).toLowerCase());
+    cb(null, ext);
+  },
+});
+
+app.post('/api/upload-font', fontUpload.single('font'), (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No font uploaded' });
+    const url = `${req.protocol}://${req.get('host')}/uploads/fonts/${req.file.filename}`;
+    const name = req.body.name || req.file.originalname.replace(/\.[^.]+$/, '');
+    // Guardar nombre en fonts.json
+    const metaPath = path.join(__dirname, '..', 'uploads', 'fonts', 'fonts.json');
+    const meta = readJson(metaPath, {});
+    meta[req.file.filename] = name;
+    writeJsonAtomic(metaPath, meta);
+    res.json({ url, filename: req.file.filename, name });
+  } catch (e) {
+    logError(e, { event: 'api/upload-font', action: 'Upload font' });
+    res.status(500).json({ error: 'Upload failed' });
+  }
+});
+
+app.get('/api/fonts', (req, res) => {
+  try {
+    const fontDir = path.join(__dirname, '..', 'uploads', 'fonts');
+    if (!fs.existsSync(fontDir)) return res.json([]);
+    const files = fs.readdirSync(fontDir).filter(f => /\.(ttf|otf|woff|woff2)$/i.test(f));
+    const metaPath = path.join(fontDir, 'fonts.json');
+    const meta = readJson(metaPath, {});
+    const fonts = files.map(f => ({
+      filename: f,
+      name: meta[f] || f.replace(/\.[^.]+$/, '').replace(/-/g, ' '),
+      url: `${req.protocol}://${req.get('host')}/uploads/fonts/${f}`,
+    }));
+    res.json(fonts);
+  } catch (e) {
+    res.json([]);
+  }
+});
+
+app.delete('/api/fonts/:filename', (req, res) => {
+  try {
+    const fontDir = path.join(__dirname, '..', 'uploads', 'fonts');
+    const filePath = path.join(fontDir, req.params.filename);
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    const metaPath = path.join(fontDir, 'fonts.json');
+    const meta = readJson(metaPath, {});
+    delete meta[req.params.filename];
+    writeJsonAtomic(metaPath, meta);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Delete failed' });
   }
 });
 
@@ -476,6 +560,74 @@ app.put('/api/guilds/:id/autorole', (req, res) => {
   res.json(updated.autoRole);
 });
 
+// POST /api/guilds/:id/reaction-role/send → Envía el mensaje de reaction role en un canal
+app.post('/api/guilds/:id/reaction-role/send', async (req, res) => {
+  try {
+    const { channelId, embed, roles, mode } = req.body;
+    const guild = client.guilds.cache.get(req.params.id);
+    if (!guild) return res.status(404).json({ error: 'Guild not found' });
+    const channel = guild.channels.cache.get(channelId);
+    if (!channel) return res.status(404).json({ error: 'Channel not found' });
+
+    const { buildEmbed } = require('./utils/buildEmbed');
+    const embedData = buildEmbed(embed, null);
+
+    if (mode === 'select') {
+      const { ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
+      const options = roles.map(r => ({ label: r.label, value: r.roleId, emoji: r.emoji || undefined }));
+      const select = new StringSelectMenuBuilder().setCustomId('reaction_role_select').setPlaceholder('Elige tu rol').addOptions(options);
+      const row = new ActionRowBuilder().addComponents(select);
+      const msg = await channel.send({ embeds: [embedData], components: [row] });
+      res.json({ success: true, messageId: msg.id });
+    } else {
+      const msg = await channel.send({ embeds: [embedData] });
+      for (const r of roles) {
+        if (r.emoji) await msg.react(r.emoji);
+      }
+      res.json({ success: true, messageId: msg.id });
+    }
+  } catch (e) {
+    logError(e, { event: 'api/reaction-role', guild: { id: req.params.id }, action: 'Send reaction role message' });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+
+// --- SISTEMA DE NIVELES ---
+app.get('/api/guilds/:id/levels', (req, res) => {
+  const config = getGuild(req.params.id);
+  res.json(config.levels);
+});
+
+app.put('/api/guilds/:id/levels', (req, res) => {
+  const config = getGuild(req.params.id);
+  const currentLevels = config.levels || {};
+  // Deep merge: preserve existing nested arrays/objects not included in request
+  const merged = { ...currentLevels };
+  for (const [key, value] of Object.entries(req.body)) {
+    if (value && typeof value === 'object' && !Array.isArray(value) && currentLevels[key] && typeof currentLevels[key] === 'object' && !Array.isArray(currentLevels[key])) {
+      merged[key] = { ...currentLevels[key], ...value };
+    } else {
+      merged[key] = value;
+    }
+  }
+  const updated = updateGuild(req.params.id, { levels: merged });
+  res.json(updated.levels);
+});
+
+app.get('/api/guilds/:id/levels/leaderboard', (req, res) => {
+  const { getLeaderboard } = require('./database/levels');
+  const board = getLeaderboard(req.params.id, parseInt(req.query.limit) || 15);
+  res.json(board);
+});
+
+app.get('/api/guilds/:id/levels/user/:userId', (req, res) => {
+  const { getUser, getRank } = require('./database/levels');
+  const user = getUser(req.params.id, req.params.userId);
+  const rank = getRank(req.params.id, req.params.userId);
+  res.json({ user, rank });
+});
+
 
 // --- ROLES DEL SERVIDOR (para el selector de auto-role) ---
 // GET /api/guilds/:id/roles → Lista todos los roles que el bot puede asignar
@@ -485,8 +637,8 @@ app.get('/api/guilds/:id/roles', (req, res) => {
 
   const roles = guild.roles.cache
     .filter(r => r.id !== guild.id && r.editable) // Excluir @everyone y roles que el bot no puede manejar
-    .map(r => ({ id: r.id, name: r.name, color: r.hexColor }))
-    .sort((a, b) => b.position - a.position); // Ordenar de mayor a menor rango
+    .sort((a, b) => b.position - a.position) // Ordenar de mayor a menor rango
+    .map(r => ({ id: r.id, name: r.name, color: r.hexColor }));
 
   res.json(roles);
 });
@@ -516,33 +668,95 @@ app.get('/api/guilds/:id/members', async (req, res) => {
 });
 
 
+// --- LIBRERÍA DE ANIMACIONES DE TEXTO (global por despliegue) ---
+// GET /api/card-animations → presets + animaciones guardadas
+app.get('/api/card-animations', (req, res) => {
+  res.json({ presets: listPresets(), animations: listCardAnimations() });
+});
+
+// POST /api/card-animations → guardar una animación nueva
+app.post('/api/card-animations', (req, res) => {
+  try {
+    if (!req.body || !Array.isArray(req.body.definition?.keyframes)) {
+      return res.status(400).json({ error: 'Se requiere definition.keyframes' });
+    }
+    const animation = createCardAnimation(req.body);
+    logInfo(`Animación guardada: ${animation.name}`, { event: 'api/card-animations', action: 'create' });
+    res.status(201).json(animation);
+  } catch (e) {
+    logError(e, { event: 'api/card-animations', action: 'create' });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PUT /api/card-animations/:id → editar nombre/definición
+app.put('/api/card-animations/:id', (req, res) => {
+  try {
+    const animation = updateCardAnimation(req.params.id, req.body || {});
+    if (!animation) return res.status(404).json({ error: 'Animación no encontrada' });
+    res.json(animation);
+  } catch (e) {
+    logError(e, { event: 'api/card-animations', action: 'update' });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE /api/card-animations/:id → borrar animación
+app.delete('/api/card-animations/:id', (req, res) => {
+  try {
+    if (!removeCardAnimation(req.params.id)) {
+      return res.status(404).json({ error: 'Animación no encontrada' });
+    }
+    res.json({ success: true });
+  } catch (e) {
+    logError(e, { event: 'api/card-animations', action: 'remove' });
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // --- PREVISUALIZAR TARJETA ---
 // POST /api/guilds/:id/preview-card/:type → Genera una tarjeta de bienvenida/despedida como imagen base64
+// Opcional: { frame } → PNG de ese frame exacto (scrubber)
+// Opcional: { draftAnimation } → animación aún no guardada que se quiere probar
 app.post('/api/guilds/:id/preview-card/:type', async (req, res) => {
   try {
     const { generateCard, generateAnimatedCard } = require('./utils/cardGenerator');
     const guild = client.guilds.cache.get(req.params.id);
     if (!guild) return res.status(404).json({ error: 'Guild not found' });
 
-    const cardConfig = req.body || {};
+    const body = req.body || {};
+    const cardConfig = { ...body };
+    const previewFrame = body.frame != null ? Number(body.frame) : null;
+    const draftAnimation = body.draftAnimation || null;
+    delete cardConfig.frame;
+    delete cardConfig.draftAnimation;
 
-    // Usar el bot como usuario de prueba para la preview
+    // Usar un usuario de prueba para la preview
+    const previewUser = {
+      id: client.user.id,
+      tag: 'TestUser#0001',
+      username: 'TestUser',
+      displayAvatarURL: (opts) => client.user.displayAvatarURL(opts),
+      createdTimestamp: client.user.createdTimestamp,
+    };
     const member = {
-      user: {
-        tag: 'TestUser#0001',
-        displayAvatarURL: () => client.user.displayAvatarURL({ dynamic: true }),
-      },
+      id: previewUser.id,
+      user: previewUser,
       guild: guild,
+      joinedTimestamp: Date.now(),
     };
 
     let buffer;
-    if (cardConfig.animated) {
+    if (previewFrame != null && !Number.isNaN(previewFrame)) {
+      // Frame puntual → PNG (lo usa el scrubber del editor de animaciones)
+      buffer = await generateCard(member, cardConfig, req.params.type === 'welcome', { frame: previewFrame, draftAnimation });
+    } else if (cardConfig.animated) {
       buffer = await generateAnimatedCard(member, cardConfig, req.params.type === 'welcome');
     } else {
       buffer = await generateCard(member, cardConfig, req.params.type === 'welcome');
     }
 
-    const ext = cardConfig.animated ? 'gif' : 'png';
+    const ext = previewFrame != null && !Number.isNaN(previewFrame) ? 'png' : (cardConfig.animated ? 'gif' : 'png');
     res.json({
       success: true,
       image: `data:image/${ext};base64,${buffer.toString('base64')}`,
@@ -575,6 +789,45 @@ app.get('/api/guilds/:id/logging', (req, res) => {
 app.put('/api/guilds/:id/logging', (req, res) => {
   const updated = updateGuild(req.params.id, { logging: req.body });
   res.json(updated.logging);
+});
+
+
+// --- SERVIDORES AUTORIZADOS ---
+app.get('/api/authorized-servers', (req, res) => {
+  const settings = getSettings();
+  const guilds = client.guilds.cache.map(g => ({
+    id: g.id,
+    name: g.name,
+    icon: g.iconURL({ dynamic: true }),
+    memberCount: g.memberCount,
+    authorized: settings.authorizedServers[g.id] !== false,
+  }));
+  res.json({ servers: guilds, hasFilter: settings.authorizedFilterEnabled === true });
+});
+
+app.put('/api/authorized-servers', (req, res) => {
+  const { authorizedServers } = req.body;
+  const updated = updateSettings({ authorizedServers });
+  res.json({ authorizedServers: updated.authorizedServers });
+});
+
+app.put('/api/authorized-filter', (req, res) => {
+  const { enabled } = req.body;
+  updateSettings({ authorizedFilterEnabled: enabled });
+  if (!enabled) updateSettings({ authorizedServers: {} });
+  res.json({ enabled });
+});
+
+
+// --- DASHBOARD CONFIG (persistente en servidor) ---
+app.get('/api/dashboard-config', (req, res) => {
+  const settings = getSettings();
+  res.json(settings.dashboardConfig || { title: "Hazuru's Assistant", subtitle: 'Dashboard', logo: '' });
+});
+
+app.put('/api/dashboard-config', (req, res) => {
+  const updated = updateSettings({ dashboardConfig: req.body });
+  res.json(updated.dashboardConfig);
 });
 
 

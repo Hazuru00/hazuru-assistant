@@ -53,6 +53,7 @@ createApp({
       { id: 'ban', label: 'Bans', icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>' },
       { id: 'kick', label: 'Kicks', icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6v1h12v-1a6 6 0 00-6-6zM21 12h-6"></path></svg>' },
       { id: 'autorole', label: 'Auto-Role', icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>' },
+      { id: 'levels', label: 'Niveles', icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>' },
       { id: 'automod', label: 'Auto-Moderación', icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>' },
       { id: 'logging', label: 'Logging', icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>' },
       { id: 'commands', label: 'Comandos', icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>' },
@@ -90,16 +91,68 @@ createApp({
 
     const cardThemePresets = { dark: 'bg-gray-900/60 border-gray-700/40', circuit: 'bg-gray-900/60 border-green-700/40', code: 'bg-gray-900/60 border-blue-700/40', neon: 'bg-gray-900/60 border-purple-700/40', sunset: 'bg-gray-900/60 border-orange-700/40' };
 
+    // Fase neutra por defecto: las cards existentes no cambian visualmente.
+    const defaultAnimPhase = () => ({ id: 'none', duration: 0.5, reverse: false });
+    const defaultTextAnimations = () => ({
+      title: { intro: defaultAnimPhase(), loop: defaultAnimPhase(), outro: defaultAnimPhase() },
+      username: { intro: defaultAnimPhase(), loop: defaultAnimPhase(), outro: defaultAnimPhase() },
+      subtitle: { intro: defaultAnimPhase(), loop: defaultAnimPhase(), outro: defaultAnimPhase() },
+    });
+
     const defaultCard = () => ({
       enabled: false,
       theme: 'dark',
-      backgroundImage: '',
-      borderColor: '#5865F2',
-      borderWidth: 2,
-      borderRadius: 10,
+      fontFamily: 'DejaVu Sans',
+      background: '',
+      bgScale: 'cover',
+      bgZoom: 100,
+      title: '',
+      subtitle: '',
+      textColor: '',
+      subtitleColor: '',
+      avatarBorderColor: '',
+      avatarBorderWidth: 5,
       animated: false,
-      overlayOpacity: 0.6,
+      overlayOpacity: 50,
+      titleSize: 28,
+      usernameSize: 20,
+      subtitleSize: 15,
+      avatarSize: 50,
+      avatarBorder: true,
+      cardBorder: true,
+      cardMargin: 20,
+      textAnimations: defaultTextAnimations(),
     });
+
+    const availableFonts = ref([]);
+    const loadFonts = async () => {
+      try {
+        const res = await fetch('/api/fonts');
+        if (res.ok) availableFonts.value = await res.json();
+      } catch {}
+    };
+
+    const uploadFont = async (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+      const formData = new FormData();
+      formData.append('font', file);
+      formData.append('name', file.name.replace(/\.[^.]+$/, ''));
+      try {
+        const res = await fetch('/api/upload-font', { method: 'POST', body: formData });
+        if (res.ok) {
+          const font = await res.json();
+          availableFonts.value.push(font);
+          currentConfig.value.card.fontFamily = font.name;
+          showToast('success', 'Fuente subida');
+        } else {
+          showToast('error', 'Error al subir fuente');
+        }
+      } catch {
+        showToast('error', 'Error de conexion');
+      }
+      event.target.value = '';
+    };
 
     const defaultEmbed = () => ({
       title: '', description: '', color: '#5865F2',
@@ -111,17 +164,40 @@ createApp({
 
     const welcomeConfig = ref({ enabled: false, channel: '', message: '', embedEnabled: true, embed: defaultEmbed(), card: defaultCard() });
     const farewellConfig = ref({ enabled: false, channel: '', message: '', embedEnabled: true, embed: { ...defaultEmbed(), color: '#ED4245' }, card: { ...defaultCard(), avatarBorderColor: '#ED4245' } });
-    const privateConfig = ref({ enabled: false, message: '', embedEnabled: true, embed: { ...defaultEmbed(), color: '#eb459e' } });
+    const privateConfig = ref({ enabled: false, message: '', embedEnabled: true, embed: { ...defaultEmbed(), color: '#eb459e' }, card: { ...defaultCard(), backgroundColor: '#1a1a2e', avatarBorderColor: '#eb459e' } });
     const boostConfig = ref({ enabled: false, channel: '', message: '', embedEnabled: true, embed: { ...defaultEmbed(), color: '#f47fff' } });
     const banConfig = ref({ enabled: false, channel: '', message: '', embedEnabled: true, embed: { ...defaultEmbed(), color: '#ED4245' } });
     const kickConfig = ref({ enabled: false, channel: '', message: '', embedEnabled: true, embed: { ...defaultEmbed(), color: '#FF9044' } });
-    const autoRoleConfig = ref({ enabled: false, roleId: '' });
+    const autoRoleConfig = ref({ enabled: false, roleId: '', botRole: { enabled: false, roleId: '' }, boostRole: { enabled: false, roleId: '' }, milestones: [], reactionRoles: [] });
+    const autoRoleTab = ref('basic');
+    const levelsConfig = ref({
+      enabled: false,
+      xpPerMessage: { min: 15, max: 25 },
+      xpCooldown: 60,
+      messageCooldown: 0,
+      channelMultipliers: [],
+      streakMultiplier: { enabled: false, dailyBonus: 0.1, maxMultiplier: 2.5 },
+      levelFormula: { base: 100, exponent: 1.5 },
+      levelRoles: [],
+      icons: [],
+      achievements: [],
+      ignoredChannels: [],
+      announcementChannel: '',
+      announceLevelUp: true,
+      announceAchievement: true,
+      levelUpEmbed: { title: '¡Subiste de nivel!', description: '¡Felicidades {user}! Ahora eres nivel **{level}**', color: '#5865F2' },
+      commandsEnabled: { rank: true, leaderboard: true, profile: true, achievements: true },
+      titleMinLevel: 10,
+    });
+    const levelsTab = ref('general');
+    const levelsLeaderboard = ref([]);
     const automodConfig = ref({
       enabled: false,
-      antiSpam: { enabled: false, maxMessages: 5, interval: 5000, action: 'delete', allowedChannels: [] },
-      antiLinks: { enabled: false, action: 'delete', whitelistedDomains: ['youtube.com', 'youtu.be', 'twitch.tv', 'discord.gg'], allowedChannels: [] },
-      antiCaps: { enabled: false, minLetters: 10, maxPercentage: 70, action: 'delete', allowedChannels: [] },
-      bannedWords: { enabled: false, words: [], wordsStr: '', action: 'delete', allowedChannels: [] },
+      antiSpam: { enabled: false, maxMessages: 5, interval: 5000, action: 'delete' },
+      antiLinks: { enabled: false, action: 'delete', whitelistedDomains: ['youtube.com', 'youtu.be', 'twitch.tv', 'discord.gg'] },
+      whitelistedDomainsStr: 'youtube.com, youtu.be, twitch.tv, discord.gg',
+      antiCaps: { enabled: false, minLetters: 10, maxPercentage: 70, action: 'delete' },
+      bannedWords: { enabled: false, words: [], wordsStr: '', action: 'delete' },
     });
     const loggingConfig = ref({
       channel: '',
@@ -137,6 +213,37 @@ createApp({
     const welcomeCardPreview = ref('');
     const farewellCardPreview = ref('');
 
+    // --- Animaciones de texto para tarjetas ---
+    const animElements = [
+      { id: 'title', label: 'Titulo' },
+      { id: 'username', label: 'Usuario' },
+      { id: 'subtitle', label: 'Subtitulo' },
+    ];
+    const animPhases = [
+      { id: 'intro', label: 'Entrada' },
+      { id: 'loop', label: 'Bucle' },
+      { id: 'outro', label: 'Salida' },
+    ];
+    const animationPresets = ref([]);
+    const cardAnimations = ref([]);
+    const animEditorOpen = ref(false);
+    const animFrame = ref(0);
+    const animSaving = ref(false);
+    const newAnimName = ref('');
+    const customDefinition = () => ({
+      easing: 'easeOutCubic',
+      keyframes: [
+        { at: 0, opacity: 0, y: 20, scale: 0.95 },
+        { at: 1, opacity: 1, y: 0, scale: 1 },
+      ],
+    });
+    const animEditor = ref({
+      element: 'title', phase: 'intro', selectedId: 'none', definition: customDefinition(),
+    });
+
+    const authorizedServers = ref([]);
+    const authorizedFilter = ref(false);
+
     const currentConfig = computed({
       get() {
         const map = { welcome: welcomeConfig, farewell: farewellConfig, private: privateConfig, boost: boostConfig, ban: banConfig, kick: kickConfig };
@@ -149,12 +256,12 @@ createApp({
     });
 
     const currentPageTitle = computed(() => {
-      const t = { home: 'Inicio', welcome: 'Bienvenidas', farewell: 'Despedidas', private: 'DM Bienvenida', boost: 'Boost', ban: 'Bans', kick: 'Kicks', autorole: 'Auto-Role', automod: 'Auto-Moderación', logging: 'Logging', commands: 'Comandos', settings: 'Ajustes' };
+      const t = { home: 'Inicio', welcome: 'Bienvenidas', farewell: 'Despedidas', private: 'DM Bienvenida', boost: 'Boost', ban: 'Bans', kick: 'Kicks', autorole: 'Auto-Role', automod: 'Auto-Moderación', logging: 'Logging', commands: 'Comandos', settings: 'Ajustes', levels: 'Niveles' };
       return t[currentPage.value] || 'Inicio';
     });
 
     const currentPageDesc = computed(() => {
-      const d = { home: 'Panel de control', welcome: 'Mensajes de bienvenida', farewell: 'Mensajes de despedida', private: 'DM de bienvenida', boost: 'Mensajes de boost', ban: 'Mensajes de ban', kick: 'Mensajes de kick', autorole: 'Rol automatico al unirse', automod: 'Filtros automaticos del chat', logging: 'Registro de eventos del servidor', commands: 'Comandos del bot', settings: 'Personaliza el dashboard' };
+      const d = { home: 'Panel de control', welcome: 'Mensajes de bienvenida', farewell: 'Mensajes de despedida', private: 'DM de bienvenida', boost: 'Mensajes de boost', ban: 'Mensajes de ban', kick: 'Mensajes de kick', autorole: 'Rol automatico al unirse', automod: 'Filtros automaticos del chat', logging: 'Registro de eventos del servidor', commands: 'Comandos del bot', settings: 'Personaliza el dashboard', levels: 'Sistema de niveles y XP' };
       return d[currentPage.value] || '';
     });
 
@@ -312,6 +419,58 @@ createApp({
       }
     };
 
+    const sendReactionRole = async (index) => {
+      if (!selectedGuild.value) return;
+      const rr = autoRoleConfig.value.reactionRoles[index];
+      if (!rr || !rr.channelId) return;
+      saving.value = true;
+      try {
+        const res = await fetch(`/api/guilds/${selectedGuild.value.id}/reaction-role/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(rr),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          rr.messageId = data.messageId;
+          await saveAutoRole();
+          showToast('success', 'Mensaje enviado');
+        } else {
+          showToast('error', 'Error al enviar');
+        }
+      } catch {
+        showToast('error', 'Error de conexion');
+      } finally {
+        saving.value = false;
+      }
+    };
+
+    const saveLevels = async () => {
+      if (!selectedGuild.value) return;
+      saving.value = true;
+      try {
+        const res = await fetch(`/api/guilds/${selectedGuild.value.id}/levels`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(levelsConfig.value),
+        });
+        if (res.ok) showToast('success', 'Niveles guardados');
+        else showToast('error', 'Error al guardar');
+      } catch {
+        showToast('error', 'Error de conexion');
+      } finally {
+        saving.value = false;
+      }
+    };
+
+    const loadLevelsLeaderboard = async () => {
+      if (!selectedGuild.value) return;
+      try {
+        const res = await fetch(`/api/guilds/${selectedGuild.value.id}/levels/leaderboard?limit=20`);
+        if (res.ok) levelsLeaderboard.value = await res.json();
+      } catch {}
+    };
+
     const saveAutoMod = async () => {
       if (!selectedGuild.value) return;
       saving.value = true;
@@ -320,6 +479,10 @@ createApp({
         if (data.bannedWords.wordsStr) {
           data.bannedWords.words = data.bannedWords.wordsStr.split(',').map(w => w.trim()).filter(Boolean);
         }
+        if (data.whitelistedDomainsStr) {
+          data.antiLinks.whitelistedDomains = data.whitelistedDomainsStr.split(',').map(d => d.trim()).filter(Boolean);
+        }
+        delete data.whitelistedDomainsStr;
         const res = await fetch(`/api/guilds/${selectedGuild.value.id}/automod`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -376,14 +539,21 @@ createApp({
     const previewCardDebounce = { welcome: null, farewell: null };
     const cardPreviewLoading = ref(false);
 
-    const previewCard = async (type) => {
+    // frame y draft son opcionales: permiten ver un instante concreto y
+    // previsualizar una animación que todavía no fue guardada.
+    const previewCard = async (type, frame = null, draft = null) => {
       if (!selectedGuild.value) return;
       cardPreviewLoading.value = true;
       try {
+        const card = type === 'welcome' ? welcomeConfig.value.card : farewellConfig.value.card;
+        const body = { ...card };
+        if (frame != null) body.frame = frame;
+        if (draft) body.draftAnimation = draft;
+
         const res = await fetch(`/api/guilds/${selectedGuild.value.id}/preview-card/${type}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(type === 'welcome' ? welcomeConfig.value.card : farewellConfig.value.card),
+          body: JSON.stringify(body),
         });
         const data = await res.json();
         if (res.ok && data.image) {
@@ -404,6 +574,162 @@ createApp({
       previewCardDebounce[type] = setTimeout(() => previewCard(type), 400);
     };
 
+    // --- Librería y editor de animaciones ---
+    const loadCardAnimations = async () => {
+      try {
+        const res = await fetch('/api/card-animations');
+        if (!res.ok) return;
+        const data = await res.json();
+        animationPresets.value = data.presets || [];
+        cardAnimations.value = data.animations || [];
+      } catch {}
+    };
+
+    function getAnimPhase(element, phase) {
+      const card = currentConfig.value.card;
+      if (!card.textAnimations) card.textAnimations = {};
+      if (!card.textAnimations[element]) card.textAnimations[element] = {};
+      if (!card.textAnimations[element][phase]) {
+        card.textAnimations[element][phase] = { id: 'none', duration: 0.5, reverse: false };
+      }
+      return card.textAnimations[element][phase];
+    }
+
+    const findDefinition = (id) => {
+      const preset = animationPresets.value.find(p => p.id === id);
+      if (preset?.definition) return JSON.parse(JSON.stringify(preset.definition));
+      const saved = cardAnimations.value.find(a => a.id === id);
+      return saved ? JSON.parse(JSON.stringify(saved.definition)) : null;
+    };
+
+    const currentAnimDraft = () => {
+      if (!animEditorOpen.value) return null;
+      const phase = getAnimPhase(animEditor.value.element, animEditor.value.phase);
+      return {
+        element: animEditor.value.element,
+        phase: animEditor.value.phase,
+        duration: phase.duration,
+        reverse: !!phase.reverse,
+        definition: animEditor.value.definition,
+      };
+    };
+
+    let animDraftTimer = null;
+    const previewAnimDraft = () => {
+      if (!selectedGuild.value || !currentConfig.value.card?.enabled) return;
+      const page = currentPage.value;
+      if (page !== 'welcome' && page !== 'farewell') return;
+      previewCard(page, animFrame.value, currentAnimDraft());
+    };
+    const previewAnimDebounced = () => {
+      if (animDraftTimer) clearTimeout(animDraftTimer);
+      animDraftTimer = setTimeout(previewAnimDraft, 120);
+    };
+
+    const animMaxFrame = computed(() => Math.max(0, (currentConfig.value.card?.animationFrames || 30) - 1));
+
+    const openAnimEditor = (element, phase) => {
+      const ph = getAnimPhase(element, phase);
+      const def = ph.id === 'none' ? customDefinition() : (findDefinition(ph.id) || customDefinition());
+      animEditor.value = {
+        element, phase,
+        selectedId: ph.id,
+        definition: JSON.parse(JSON.stringify(def)),
+      };
+      const saved = cardAnimations.value.find(a => a.id === ph.id);
+      newAnimName.value = saved ? saved.name : '';
+      animEditorOpen.value = true;
+      previewAnimDebounced();
+    };
+
+    const onAnimPhaseChange = (element, phase) => {
+      const ph = getAnimPhase(element, phase);
+      if (!ph.duration) ph.duration = 0.5;
+      if (animEditorOpen.value && animEditor.value.element === element && animEditor.value.phase === phase) {
+        animEditor.value.selectedId = ph.id;
+        const def = findDefinition(ph.id);
+        if (def) animEditor.value.definition = def;
+      }
+      previewAnimDebounced();
+    };
+
+    const addKeyframe = () => {
+      const list = animEditor.value.definition.keyframes;
+      const last = list[list.length - 1] || { at: 1 };
+      list.push({ ...last, at: Math.min(1, (last.at || 0) + 0.25) });
+      list.sort((a, b) => a.at - b.at);
+      previewAnimDebounced();
+    };
+
+    const removeKeyframe = (index) => {
+      if (animEditor.value.definition.keyframes.length <= 2) return;
+      animEditor.value.definition.keyframes.splice(index, 1);
+      previewAnimDebounced();
+    };
+
+    const saveCardAnimation = async (update = false) => {
+      const id = animEditor.value.selectedId;
+      if (update && !id.startsWith('anim_')) return;
+      const name = newAnimName.value.trim();
+      if (!name) { showToast('error', 'Ponle un nombre a la animacion'); return; }
+
+      animSaving.value = true;
+      try {
+        const url = update ? `/api/card-animations/${id}` : '/api/card-animations';
+        const res = await fetch(url, {
+          method: update ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, definition: animEditor.value.definition }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error al guardar');
+        if (update) {
+          const idx = cardAnimations.value.findIndex(a => a.id === id);
+          if (idx >= 0) cardAnimations.value[idx] = data;
+        } else {
+          cardAnimations.value.push(data);
+          getAnimPhase(animEditor.value.element, animEditor.value.phase).id = data.id;
+          animEditor.value.selectedId = data.id;
+        }
+        showToast('success', update ? 'Animación actualizada' : 'Animación guardada');
+      } catch (e) {
+        showToast('error', e.message);
+      } finally {
+        animSaving.value = false;
+      }
+    };
+
+    const applySavedAnimation = (anim) => {
+      const phase = getAnimPhase(animEditor.value.element, animEditor.value.phase);
+      phase.id = anim.id;
+      animEditor.value.selectedId = anim.id;
+      animEditor.value.definition = JSON.parse(JSON.stringify(anim.definition));
+      newAnimName.value = anim.name;
+      previewAnimDebounced();
+    };
+
+    const deleteCardAnim = async (id) => {
+      if (!confirm('¿Borrar esta animación? Se quitará de las cards que la usen.')) return;
+      try {
+        const res = await fetch(`/api/card-animations/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('No se pudo borrar');
+        cardAnimations.value = cardAnimations.value.filter(a => a.id !== id);
+        for (const cfg of [welcomeConfig.value, farewellConfig.value]) {
+          const map = cfg.card?.textAnimations;
+          if (!map) continue;
+          for (const el of Object.keys(map)) {
+            for (const ph of Object.keys(map[el])) {
+              if (map[el][ph]?.id === id) map[el][ph].id = 'none';
+            }
+          }
+        }
+        if (animEditor.value.selectedId === id) animEditor.value.selectedId = 'none';
+        showToast('success', 'Animación borrada');
+      } catch (e) {
+        showToast('error', e.message);
+      }
+    };
+
     // Live preview: watch card config changes and regenerate
     watch([currentPage, () => welcomeConfig.value.card, () => farewellConfig.value.card], () => {
       if (!selectedGuild.value) return;
@@ -411,7 +737,8 @@ createApp({
       if (page !== 'welcome' && page !== 'farewell') return;
       const card = page === 'welcome' ? welcomeConfig.value.card : farewellConfig.value.card;
       if (card && card.enabled) {
-        previewCardDebounced(page);
+        if (animEditorOpen.value) previewAnimDebounced();
+        else previewCardDebounced(page);
       }
     }, { deep: true });
 
@@ -439,7 +766,7 @@ createApp({
     const loadConfigs = async () => {
       if (!selectedGuild.value) return;
       const id = selectedGuild.value.id;
-      const [w, f, p, b, ban, k, ar, am, lg] = await Promise.all([
+      const [w, f, p, b, ban, k, ar, am, lg, lv] = await Promise.all([
         fetch(`/api/guilds/${id}/welcome`).then(r => r.json()),
         fetch(`/api/guilds/${id}/farewell`).then(r => r.json()),
         fetch(`/api/guilds/${id}/private-welcome`).then(r => r.json()),
@@ -449,6 +776,7 @@ createApp({
         fetch(`/api/guilds/${id}/autorole`).then(r => r.json()),
         fetch(`/api/guilds/${id}/automod`).then(r => r.json()),
         fetch(`/api/guilds/${id}/logging`).then(r => r.json()),
+        fetch(`/api/guilds/${id}/levels`).then(r => r.json()),
       ]);
       welcomeConfig.value = { ...welcomeConfig.value, ...w, card: { ...defaultCard(), ...(w.card || {}) } };
       farewellConfig.value = { ...farewellConfig.value, ...f, card: { ...defaultCard(), ...(f.card || {}) } };
@@ -456,11 +784,19 @@ createApp({
       boostConfig.value = b;
       banConfig.value = ban;
       kickConfig.value = k;
-      autoRoleConfig.value = ar;
+      autoRoleConfig.value = {
+        enabled: ar.enabled || false,
+        roleId: ar.roleId || '',
+        botRole: { enabled: ar.botRole?.enabled || false, roleId: ar.botRole?.roleId || '' },
+        boostRole: { enabled: ar.boostRole?.enabled || false, roleId: ar.boostRole?.roleId || '' },
+        milestones: ar.milestones || [],
+        reactionRoles: ar.reactionRoles || [],
+      };
       automodConfig.value = {
         enabled: am.enabled || false,
         antiSpam: { enabled: am.antiSpam?.enabled || false, maxMessages: am.antiSpam?.maxMessages || 5, interval: am.antiSpam?.interval || 5000, action: am.antiSpam?.action || 'delete' },
         antiLinks: { enabled: am.antiLinks?.enabled || false, action: am.antiLinks?.action || 'delete', whitelistedDomains: am.antiLinks?.whitelistedDomains || ['youtube.com', 'youtu.be', 'twitch.tv', 'discord.gg'] },
+        whitelistedDomainsStr: (am.antiLinks?.whitelistedDomains || ['youtube.com', 'youtu.be', 'twitch.tv', 'discord.gg']).join(', '),
         antiCaps: { enabled: am.antiCaps?.enabled || false, minLetters: am.antiCaps?.minLetters || 10, maxPercentage: am.antiCaps?.maxPercentage || 70, action: am.antiCaps?.action || 'delete' },
         bannedWords: { enabled: am.bannedWords?.enabled || false, words: am.bannedWords?.words || [], wordsStr: (am.bannedWords?.words || []).join(', '), action: am.bannedWords?.action || 'delete' },
       };
@@ -471,6 +807,26 @@ createApp({
         voiceStateUpdate: lg.voiceStateUpdate === true,
         roleUpdate: lg.roleUpdate === true,
       };
+      levelsConfig.value = {
+        enabled: lv.enabled || false,
+        xpPerMessage: { min: lv.xpPerMessage?.min || 15, max: lv.xpPerMessage?.max || 25 },
+        xpCooldown: lv.xpCooldown || 60,
+        messageCooldown: lv.messageCooldown || 0,
+        channelMultipliers: lv.channelMultipliers || [],
+        streakMultiplier: { enabled: lv.streakMultiplier?.enabled || false, dailyBonus: lv.streakMultiplier?.dailyBonus || 0.1, maxMultiplier: lv.streakMultiplier?.maxMultiplier || 2.5 },
+        levelFormula: { base: lv.levelFormula?.base || 100, exponent: lv.levelFormula?.exponent || 1.5 },
+        levelRoles: lv.levelRoles || [],
+        icons: lv.icons || [],
+        achievements: lv.achievements || [],
+        ignoredChannels: lv.ignoredChannels || [],
+        announcementChannel: lv.announcementChannel || '',
+        announceLevelUp: lv.announceLevelUp !== false,
+        announceAchievement: lv.announceAchievement !== false,
+        levelUpEmbed: { title: lv.levelUpEmbed?.title || '¡Subiste de nivel!', description: lv.levelUpEmbed?.description || '¡Felicidades {user}! Ahora eres nivel **{level}**', color: lv.levelUpEmbed?.color || '#5865F2' },
+        commandsEnabled: { rank: lv.commandsEnabled?.rank !== false, leaderboard: lv.commandsEnabled?.leaderboard !== false, profile: lv.commandsEnabled?.profile !== false, achievements: lv.commandsEnabled?.achievements !== false },
+        titleMinLevel: lv.titleMinLevel || 10,
+      };
+      if (levelsConfig.value.enabled) loadLevelsLeaderboard();
     };
 
     const loadGuilds = async () => {
@@ -483,16 +839,84 @@ createApp({
       }
     };
 
-    const loadDashboardConfig = () => {
-      const saved = localStorage.getItem('dashboardConfig');
-      if (saved) {
-        try { Object.assign(dashboardConfig.value, JSON.parse(saved)); } catch {}
+    const loadAuthorizedServers = async () => {
+      try {
+        const res = await fetch('/api/authorized-servers');
+        const data = await res.json();
+        authorizedServers.value = data.servers;
+        authorizedFilter.value = data.hasFilter;
+      } catch {}
+    };
+
+    const toggleServerAuth = async (guildId, authorized) => {
+      try {
+        // Fetch current state from server
+        const settingsRes = await fetch('/api/authorized-servers');
+        const { servers } = await settingsRes.json();
+
+        // Build blocklist: only servers that are NOT authorized
+        // (empty = mode libre, all servers work)
+        const current = {};
+        for (const s of servers) {
+          if (s.id === guildId) {
+            // This is the one we're toggling
+            if (!authorized) current[s.id] = false;
+            // If authorized, don't add (means allowed)
+          } else {
+            // Other servers: keep their current state
+            if (!s.authorized) current[s.id] = false;
+          }
+        }
+
+        await fetch('/api/authorized-servers', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ authorizedServers: current }),
+        });
+        await loadAuthorizedServers();
+        showToast('success', authorized ? 'Servidor autorizado' : 'Servidor desautorizado');
+      } catch {
+        showToast('error', 'Error al guardar');
       }
     };
 
-    const saveDashboardConfig = () => {
-      localStorage.setItem('dashboardConfig', JSON.stringify(dashboardConfig.value));
-      showToast('success', 'Ajustes del dashboard guardados');
+    const toggleAuthFilter = async (enabled) => {
+      try {
+        await fetch('/api/authorized-filter', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled }),
+        });
+        authorizedFilter.value = enabled;
+        await loadAuthorizedServers();
+        showToast('success', enabled ? 'Filtro activado: solo servidores autorizados' : 'Filtro desactivado: todos los servidores pueden usar el bot');
+      } catch {
+        showToast('error', 'Error al guardar');
+      }
+    };
+
+    const loadDashboardConfig = async () => {
+      try {
+        const res = await fetch('/api/dashboard-config');
+        if (res.ok) {
+          const data = await res.json();
+          dashboardConfig.value = { ...dashboardConfig.value, ...data };
+        }
+      } catch {}
+    };
+
+    const saveDashboardConfig = async () => {
+      try {
+        const res = await fetch('/api/dashboard-config', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(dashboardConfig.value),
+        });
+        if (res.ok) showToast('success', 'Ajustes del dashboard guardados');
+        else showToast('error', 'Error al guardar');
+      } catch {
+        showToast('error', 'Error de conexion');
+      }
     };
 
     const uploadDashboardLogo = async (event) => {
@@ -516,8 +940,15 @@ createApp({
       event.target.value = '';
     };
 
+    // El scrubber y el borrador también deben refrescar la preview
+    watch(animFrame, previewAnimDebounced);
+    watch(animEditor, previewAnimDebounced, { deep: true });
+
     onMounted(() => {
       loadDashboardConfig();
+      loadAuthorizedServers();
+      loadFonts();
+      loadCardAnimations();
       socket.on('status', (data) => { status.value = data.status; });
       socket.on('stats', (data) => {
         stats.value[0].value = data.guilds;
@@ -530,16 +961,22 @@ createApp({
     return {
       status, guilds, selectedGuild, channels, currentPage, stats, commands,
       navItems, currentPageTitle, currentPageDesc, loadingGuilds, saving, toasts,
-      welcomeConfig, farewellConfig, privateConfig, boostConfig, banConfig, kickConfig, autoRoleConfig,
-      automodConfig, loggingConfig,
+      welcomeConfig, farewellConfig, privateConfig, boostConfig, banConfig, kickConfig, autoRoleConfig, autoRoleTab,
+      levelsConfig, levelsTab, levelsLeaderboard,
+      automodConfig, loggingConfig, authorizedServers, authorizedFilter,
       currentConfig, roles, members, previewMember, dashboardConfig,
-      embedTabs, activeEmbedTab, colorPresets, availableVars,
+      embedTabs, activeEmbedTab, colorPresets, availableVars, availableFonts,
       configTitle, configDesc, hasInlineFields, sendingPreview,
-      selectGuild, saveConfig, saveAutoRole, saveAutoMod, saveLogging,
-      saveDashboardConfig, uploadDashboardLogo, uploadCardBg, previewCard,
+      selectGuild, saveConfig, saveAutoRole, sendReactionRole, saveAutoMod, saveLogging,
+      saveLevels, loadLevelsLeaderboard,
+      saveDashboardConfig, uploadDashboardLogo, uploadCardBg, uploadFont, previewCard,
       resetEmbed, addField, copyVar, replacePreview,
-      uploadImage, sendPreview, showToast,
+      uploadImage, sendPreview, showToast, toggleServerAuth, toggleAuthFilter,
       welcomeCardPreview, farewellCardPreview, cardPreviewLoading,
+      animElements, animPhases, animationPresets, cardAnimations,
+      animEditorOpen, animFrame, animMaxFrame, animSaving, newAnimName, animEditor,
+      getAnimPhase, openAnimEditor, onAnimPhaseChange, addKeyframe, removeKeyframe,
+      saveCardAnimation, deleteCardAnim, previewAnimDraft, applySavedAnimation,
     };
   }
 }).mount('#app');

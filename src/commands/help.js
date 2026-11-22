@@ -29,8 +29,12 @@ module.exports = {
         { name: '📊 Informacion', value: '`/userinfo` `/avatar` `/server` `/serverinfo`', inline: false },
         // Categoría: Utilidad
         { name: '⚙️ Utilidad', value: '`/poll` `/remind` `/announce` `/nick`', inline: false },
+        // Categoría: Niveles
+        { name: '📈 Niveles', value: '`/rank` `/leaderboard` `/profile` `/achievements` `/title` `/racha`', inline: false },
         // Categoría: Moderación (solo admins)
         { name: '🔨 Moderación (Admin)', value: '`/ban` `/kick` `/warn` `/warnings` `/unwarn` `/timeout` `/untimeout` `/purge` `/slowmode`', inline: false },
+        // Categoría: Admin Niveles
+        { name: '🔧 Admin Niveles', value: '`/setlevel` `/setxp` `/resetlevels`', inline: false },
         // Variables de mensaje disponibles en la configuración del panel web
         { name: 'Variables de Mensaje', value: '`{user}` `{user.name}` `{user.id}` `{user.avatar}` `{user.tag}` `{user.mention}` `{user.createdAt}` `{user.joinedAt}` `{server}` `{server.id}` `{server.icon}` `{memberCount}` `{boost}` `{date}` `{time}` `{moderator}` `{reason}`', inline: false },
       )

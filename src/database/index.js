@@ -32,9 +32,18 @@
 
 const fs = require('fs');
 const path = require('path');
+const { createBackup } = require('./backup');
+const { readJson, writeJsonAtomic } = require('./atomic');
 
-// Ruta al archivo JSON de base de datos
 const DB_PATH = path.join(__dirname, 'guilds.json');
+const LOG_PATH = path.join(__dirname, '..', '..', 'logs', 'guilds-changes.log');
+
+const logChange = (action, details) => {
+  try {
+    const line = `[${new Date().toISOString()}] ${action} | ${details}\n`;
+    fs.appendFileSync(LOG_PATH, line);
+  } catch {}
+};
 
 
 // ============================================================================
@@ -80,20 +89,20 @@ const defaultConfig = () => ({
   welcome: {
     enabled: false, channel: '', message: '', embedEnabled: true, embed: defaultEmbed(),
     card: {
-      enabled: false, theme: 'dark', background: '', title: 'Bienvenido',
+      enabled: false, theme: 'dark', fontFamily: 'DejaVu Sans', background: '', bgScale: 'cover', bgZoom: 100, title: 'Bienvenido',
       subtitle: 'Miembro #{memberCount}', textColor: '', subtitleColor: '',
-      avatarBorderColor: '', avatarBorderWidth: 5, font: 'sans-serif',
-      overlayOpacity: 50, blur: false, animated: false, animationFrames: 30, animationDelay: 100,
+      avatarBorderColor: '', avatarBorderWidth: 5, avatarSize: 50, avatarBorder: true, titleSize: 28, usernameSize: 20, subtitleSize: 15,
+      overlayOpacity: 50, blur: false, animated: false, animationFrames: 30, animationDelay: 100,       cardBorder: true, cardMargin: 20,
     },
   },
   // --- DESPEDIDA ---
   farewell: {
     enabled: false, channel: '', message: '', embedEnabled: true, embed: { ...defaultEmbed(), color: '#ED4245' },
     card: {
-      enabled: false, theme: 'dark', background: '', title: 'Adiós',
+      enabled: false, theme: 'dark', fontFamily: 'DejaVu Sans', background: '', bgScale: 'cover', bgZoom: 100, title: 'Adiós',
       subtitle: 'Te extrañaremos', textColor: '', subtitleColor: '',
-      avatarBorderColor: '', avatarBorderWidth: 5, font: 'sans-serif',
-      overlayOpacity: 50, blur: false, animated: false, animationFrames: 30, animationDelay: 100,
+      avatarBorderColor: '', avatarBorderWidth: 5, avatarSize: 50, avatarBorder: true, titleSize: 28, usernameSize: 20, subtitleSize: 15,
+      overlayOpacity: 50, blur: false, animated: false, animationFrames: 30, animationDelay: 100,       cardBorder: true, cardMargin: 20,
     },
   },
   // --- BIENVENIDA PRIVADA (DM) ---
@@ -105,7 +114,48 @@ const defaultConfig = () => ({
   // --- KICK ---
   kick: { enabled: false, channel: '', message: '', embedEnabled: true, embed: { ...defaultEmbed(), color: '#FF9044' } },
   // --- ROL AUTOMÁTICO ---
-  autoRole: { enabled: false, roleId: '' },
+  autoRole: {
+    enabled: false, roleId: '',
+    botRole: { enabled: false, roleId: '' },
+    boostRole: { enabled: false, roleId: '' },
+    milestones: [],
+    reactionRoles: [],
+  },
+  // --- SISTEMA DE NIVELES ---
+  levels: {
+    enabled: false,
+    xpPerMessage: { min: 15, max: 25 },
+    xpCooldown: 60,
+    messageCooldown: 0,
+    channelMultipliers: [],
+    streakMultiplier: { enabled: false, dailyBonus: 0.1, maxMultiplier: 2.5 },
+    levelFormula: { base: 100, exponent: 1.5 },
+    levelRoles: [],
+    icons: [
+      { minLevel: 1, icon: '🌱', label: 'Semilla' },
+      { minLevel: 10, icon: '⚔️', label: 'Guerrero' },
+      { minLevel: 25, icon: '🛡️', label: 'Guardian' },
+      { minLevel: 50, icon: '👑', label: 'Rey' },
+      { minLevel: 100, icon: '🌟', label: 'Leyenda' },
+    ],
+    achievements: [
+      { id: 'first_message', name: 'Primer Mensaje', description: 'Envia tu primer mensaje', icon: '💬', type: 'messages', target: 1 },
+      { id: 'chatterbox', name: 'Hablador', description: 'Envia 500 mensajes', icon: '🗣️', type: 'messages', target: 500 },
+      { id: 'social', name: 'Social', description: 'Envia 2000 mensajes', icon: '🎉', type: 'messages', target: 2000 },
+      { id: 'level_5', name: 'Novato', description: 'Alcanza el nivel 5', icon: '⭐', type: 'level', target: 5 },
+      { id: 'level_10', name: 'Iniciado', description: 'Alcanza el nivel 10', icon: '🔥', type: 'level', target: 10 },
+      { id: 'level_25', name: 'Veterano', description: 'Alcanza el nivel 25', icon: '💎', type: 'level', target: 25 },
+      { id: 'level_50', name: 'Maestro', description: 'Alcanza el nivel 50', icon: '🏅', type: 'level', target: 50 },
+      { id: 'level_100', name: 'Leyenda', description: 'Alcanza el nivel 100', icon: '👑', type: 'level', target: 100 },
+    ],
+    ignoredChannels: [],
+    announcementChannel: '',
+    announceLevelUp: true,
+    announceAchievement: true,
+    levelUpEmbed: { title: '¡Subiste de nivel!', description: '¡Felicidades {user}! Ahora eres nivel **{level}**', color: '#5865F2' },
+    commandsEnabled: { rank: true, leaderboard: true, profile: true, achievements: true },
+    titleMinLevel: 10,
+  },
   // --- AUTO-MODERACIÓN ---
   autoMod: {
     enabled: false,
@@ -127,22 +177,13 @@ const defaultConfig = () => ({
  * Lee el archivo JSON y devuelve el objeto.
  * Si el archivo no existe o está corrupto, devuelve { guilds: {} }
  */
-const read = () => {
-  try {
-    const data = fs.readFileSync(DB_PATH, 'utf8');
-    return JSON.parse(data);
-  } catch {
-    return { guilds: {} };
-  }
-};
+const read = () => readJson(DB_PATH, { guilds: {} });
 
 /**
- * Escribe datos al archivo JSON.
+ * Escribe datos al archivo JSON de forma atómica.
  * Sobrescribe todo el contenido del archivo.
  */
-const write = (data) => {
-  fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
-};
+const write = (data) => writeJsonAtomic(DB_PATH, data);
 
 
 // ============================================================================
@@ -209,6 +250,8 @@ const getGuild = (guildId) => {
 const updateGuild = (guildId, data) => {
   const db = read();
   const current = getGuild(guildId);
+  logChange('UPDATE_GUILD', `guild=${guildId} keys=${Object.keys(data).join(',')}`);
+  createBackup('guilds.json');
   db.guilds[guildId] = { ...current, ...data };
   write(db);
   return db.guilds[guildId];

@@ -16,7 +16,7 @@
  * ============================================================================
  */
 
-const { getGuild } = require('../database');
+const { getGuild, updateGuild } = require('../database');
 const { generateCard, generateAnimatedCard } = require('../utils/cardGenerator');
 const { replaceVars } = require('../utils/replaceVars');
 const { buildEmbed } = require('../utils/buildEmbed');
@@ -28,14 +28,93 @@ module.exports = {
     const config = getGuild(member.guild.id);
 
     // ========================================================================
-    // 1. AUTO-ROLE: Asignar rol automáticamente
+    // 1. AUTO-ROLE: Roles inteligentes
     // ========================================================================
-    if (config.autoRole.enabled && config.autoRole.roleId) {
+    const autoRole = config.autoRole || {};
+    const rolesToAdd = [];
+
+    // Rol básico para todos
+    if (autoRole.enabled && autoRole.roleId) {
+      const role = member.guild.roles.cache.get(autoRole.roleId);
+      if (role) rolesToAdd.push(role);
+    }
+
+    // Rol para bots
+    if (autoRole.botRole?.enabled && autoRole.botRole.roleId && member.user.bot) {
+      const role = member.guild.roles.cache.get(autoRole.botRole.roleId);
+      if (role) rolesToAdd.push(role);
+    }
+
+    // Rol para boosters
+    if (autoRole.boostRole?.enabled && autoRole.boostRole.roleId && member.premiumSince) {
+      const role = member.guild.roles.cache.get(autoRole.boostRole.roleId);
+      if (role) rolesToAdd.push(role);
+    }
+
+    // Asignar roles
+    if (rolesToAdd.length > 0) {
       try {
-        const role = member.guild.roles.cache.get(config.autoRole.roleId);
-        if (role) await member.roles.add(role);
+        await member.roles.add(rolesToAdd);
       } catch (e) {
-        logError(e, { event: 'guildMemberAdd', guild: member.guild, user: member.user, section: 'autoRole', action: 'Assign role', config: { roleId: config.autoRole.roleId } });
+        logError(e, { event: 'guildMemberAdd', guild: member.guild, user: member.user, section: 'autoRole', action: 'Assign roles', config: { roleIds: rolesToAdd.map(r => r.id) } });
+      }
+    }
+
+    // ========================================================================
+    // 1b. MILESTONES: Roles para primeros N miembros
+    // ========================================================================
+    if (autoRole.milestones?.length > 0) {
+      const memberCount = member.guild.memberCount;
+      let updated = false;
+
+      for (const milestone of autoRole.milestones) {
+        if (milestone.completed) continue;
+        if (!milestone.enabled || !milestone.roleId) continue;
+
+        if (memberCount <= milestone.maxMembers) {
+          // Asignar rol milestone
+          const role = member.guild.roles.cache.get(milestone.roleId);
+          if (role) {
+            try {
+              await member.roles.add(role);
+              logInfo('Milestone role assigned', { guild: member.guild.name, user: member.user.tag, milestone: milestone.maxMembers, role: role.name });
+            } catch (e) {
+              logError(e, { event: 'guildMemberAdd', guild: member.guild, user: member.user, section: 'milestone', action: 'Assign milestone role', config: { roleId: milestone.roleId, maxMembers: milestone.maxMembers } });
+            }
+          }
+        }
+
+        // Si alcanzó la meta, marcar como completado y avisar
+        if (memberCount >= milestone.maxMembers && !milestone.completed) {
+          milestone.completed = true;
+          updated = true;
+
+          // Enviar announce
+          if (milestone.announceChannel) {
+            const channel = member.guild.channels.cache.get(milestone.announceChannel);
+            if (channel) {
+              try {
+                const embedData = {
+                  title: milestone.announceEmbed?.title || 'Meta alcanzada',
+                  description: (milestone.announceMessage || `¡Meta de ${milestone.maxMembers} miembros alcanzada! Ya no se asignará el rol automáticamente.`)
+                    .replace(/{memberCount}/g, String(memberCount))
+                    .replace(/{role}/g, `<@&${milestone.roleId}>`),
+                  color: milestone.announceEmbed?.color || '#5865F2',
+                };
+                const embed = buildEmbed(embedData, null);
+                await channel.send({ embeds: [embed] });
+              } catch (e) {
+                logError(e, { event: 'guildMemberAdd', guild: member.guild, section: 'milestone', action: 'Send announce' });
+              }
+            }
+          }
+
+          logInfo('Milestone completed', { guild: member.guild.name, milestone: milestone.maxMembers, memberCount });
+        }
+      }
+
+      if (updated) {
+        updateGuild(member.guild.id, { autoRole });
       }
     }
 

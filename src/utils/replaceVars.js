@@ -50,30 +50,10 @@ const replaceVars = (str, source) => {
 
   let vars = {};
 
-  // --- CASO 1: Miembro de Discord (tiene guild y user) ---
-  // Se usa en: bienvenida, despedida, boost
-  if (source && source.guild && source.user) {
-    const member = source;
-    vars = {
-      user: `<@${member.id}>`,
-      'user.name': member.user.username,
-      'user.id': member.id,
-      'user.avatar': member.user.displayAvatarURL({ dynamic: true, size: 256 }),
-      'user.tag': member.user.tag,
-      'user.mention': `<@${member.id}>`,
-      // <t:TIMESTAMP:R> formatea como "hace X tiempo" en Discord
-      'user.createdAt': `<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`,
-      'user.joinedAt': member.joinedTimestamp ? `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>` : 'Desconocido',
-      server: member.guild.name,
-      'server.id': member.guild.id,
-      'server.icon': member.guild.iconURL({ dynamic: true }) || '',
-      memberCount: String(member.guild.memberCount),
-      boost: String(member.guild.premiumSubscriptionCount || 0),
-    };
-
-  // --- CASO 2: Info de ban (tiene user, guild, executor, reason) ---
-  // Se usa en: mensaje de ban
-  } else if (source && source.user && source.guild && source.executor) {
+  // --- CASO 1: Info de ban (tiene user, guild, executor) ---
+  // Se usa en: mensaje de ban — DEBE IR ANTES que el caso de miembro
+  // porque los bans también tienen guild y user
+  if (source && source.guild && source.user && source.executor) {
     const ban = source;
     vars = {
       user: ban.user.tag,
@@ -87,6 +67,26 @@ const replaceVars = (str, source) => {
       memberCount: String(ban.guild.memberCount),
       moderator: ban.executor ? `<@${ban.executor.id}>` : 'Desconocido',
       reason: ban.reason || 'Sin razon',
+    };
+
+  // --- CASO 2: Miembro de Discord (tiene guild y user) ---
+  // Se usa en: bienvenida, despedida, boost
+  } else if (source && source.guild && source.user) {
+    const member = source;
+    vars = {
+      user: `<@${member.id}>`,
+      'user.name': member.user.username,
+      'user.id': member.id,
+      'user.avatar': member.user.displayAvatarURL({ dynamic: true, size: 256 }),
+      'user.tag': member.user.tag,
+      'user.mention': `<@${member.id}>`,
+      'user.createdAt': `<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`,
+      'user.joinedAt': member.joinedTimestamp ? `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>` : 'Desconocido',
+      server: member.guild.name,
+      'server.id': member.guild.id,
+      'server.icon': member.guild.iconURL({ dynamic: true }) || '',
+      memberCount: String(member.guild.memberCount),
+      boost: String(member.guild.premiumSubscriptionCount || 0),
     };
 
   // --- CASO 3: Objeto plano (key-value personalizado) ---

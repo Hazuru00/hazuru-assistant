@@ -34,17 +34,17 @@
  * ============================================================================
  */
 
-const fs = require('fs');
 const path = require('path');
+const { createBackup } = require('./backup');
+const { readJson, writeJsonAtomic } = require('./atomic');
 
 const DB_PATH = path.join(__dirname, 'reminders.json');
 
-const read = () => {
-  try { return JSON.parse(fs.readFileSync(DB_PATH, 'utf8')); } catch { return {}; }
-};
+const read = () => readJson(DB_PATH, {});
 
 const write = (data) => {
-  fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
+  createBackup('reminders.json');
+  writeJsonAtomic(DB_PATH, data);
 };
 
 /**
