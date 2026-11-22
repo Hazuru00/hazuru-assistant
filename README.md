@@ -222,6 +222,17 @@ Por ahora el alcance es el bot local: cada usuario crea su animación custom y l
 | `/setlevel <usuario> <nivel>` | Fijar nivel | Admin |
 | `/setxp <usuario> <xp>` | Fijar XP | Admin |
 | `/resetlevels` | Resetear niveles del servidor | Admin |
+| `/config view [sección]` | Panel de solo lectura de la config | Admin |
+| `/owner panel [sección]` | Panel interactivo para editar la config | Solo el dueño del bot |
+| `/owner whoami` | Comprobar tu identidad como dueño | Solo el dueño del bot |
+| `/owner settings view\|filter\|servers` | Ajustes globales del bot | Solo el dueño del bot |
+| `/owner dashboard status` | Estado y alcance del dashboard | Solo el dueño del bot |
+
+**Dos niveles de acceso a la configuración:** los administradores pueden *ver*
+la configuración con `/config`, pero no pueden cambiar nada. Las escrituras
+(botones, selects y modales del panel de edición) comprueban el ID del dueño
+(`OPENCODE_OWNER_ID`) antes de guardar. El panel cubre los campos esenciales por
+sección; el dashboard sigue siendo la interfaz completa.
 
 ---
 
@@ -305,6 +316,11 @@ hazuru-assistant/
 Accesible en `http://127.0.0.1:3001` (o `PORT` configurado). Usa `127.0.0.1`
 en vez de `localhost`: el servidor escucha en IPv4 y `localhost` puede resolver a `::1`.
 
+> **Solo localhost:** el servidor se enlaza en `127.0.0.1`, no en `0.0.0.0`.
+> El dashboard no tiene autenticación, así que no es accesible desde otros
+> equipos de la red. Si necesitás cambiar algo desde Discord, usá el panel del
+> dueño (`/owner panel`); los admins tienen `/config` para solo lectura.
+
 - **SPA Vue 3** (CDN, sin build step)
 - **Tailwind CSS** (CDN)
 - **Socket.IO** — stats en tiempo real (servers, users, uptime cada 5s)
@@ -329,8 +345,9 @@ cp .env.example .env
 docker compose up -d
 ```
 
-- Usa reverse proxy (Nginx/Caddy) con SSL para exponer puerto 3001
-- Configura `CLIENT_SECRET` + OAuth2 redirect URI si quieres login en dashboard
+- El dashboard escucha solo en `127.0.0.1`: **no** lo expongas con reverse proxy
+  tal cual, porque no tiene autenticación. Antes de hacerlo público haría falta
+  añadir login/OAuth2 (no implementado; ver la visión a futuro en `AGENTS.md`).
 
 ### Opción B: Railway / Render / Fly.io
 

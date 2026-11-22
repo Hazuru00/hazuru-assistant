@@ -212,7 +212,7 @@ no se renderiza dentro de una imagen.
 - El bot usa `network_mode: host` para acceder a OpenCode en localhost
 - DNS fix: `dns: [8.8.8.8, 8.8.4.4]` para evitar errores de resolución
 - Las fuentes custom van en `uploads/fonts/` y se registran al iniciar
-- El dashboard/API escucha en `0.0.0.0:3001`; usar `http://127.0.0.1:3001` (no `localhost`, que puede resolver a `::1`)
+- El dashboard/API escucha en `127.0.0.1:3001` (solo esta máquina, sin autenticación); usar `http://127.0.0.1:3001` (no `localhost`, que puede resolver a `::1`)
 
 ## Variables de entorno (.env)
 ```
@@ -220,7 +220,7 @@ DISCORD_TOKEN=       # Token del bot
 CLIENT_ID=           # Client ID
 CLIENT_SECRET=       # Client Secret
 GUILD_ID=            # Guild ID principal
-OPENCODE_OWNER_ID=   # ID del owner para comandos !ai
+OPENCODE_OWNER_ID=   # Único dueño: comandos !ai y /owner (si falta, nadie es dueño)
 OPENCODE_SERVER_URL= # URL de OpenCode (http://127.0.0.1:4096)
 PORT=3001            # Puerto del dashboard
 ```

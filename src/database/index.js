@@ -258,4 +258,4 @@ const updateGuild = (guildId, data) => {
 };
 
 
-module.exports = { getGuild, updateGuild, defaultEmbed };
+module.exports = { getGuild, updateGuild, defaultEmbed, defaultConfig };

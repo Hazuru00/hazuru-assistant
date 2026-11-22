@@ -897,8 +897,10 @@ client.login(process.env.DISCORD_TOKEN).then(() => {
 
 // Iniciar el servidor web en el puerto configurado
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Frontend server running on http://localhost:${PORT}`);
+// El dashboard es local: solo se enlaza en IPv4 loopback. Cambiar el bind
+// a 0.0.0.0 lo expondría a cualquier equipo de la red sin autenticación.
+server.listen(PORT, '127.0.0.1', () => {
+  console.log(`Frontend server running on http://127.0.0.1:${PORT}`);
 });
 
 

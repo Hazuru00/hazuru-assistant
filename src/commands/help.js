@@ -12,6 +12,7 @@
  */
 
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { isOwner } = require('../utils/owner');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -28,7 +29,7 @@ module.exports = {
         // Categoría: Información
         { name: '📊 Informacion', value: '`/userinfo` `/avatar` `/server` `/serverinfo`', inline: false },
         // Categoría: Utilidad
-        { name: '⚙️ Utilidad', value: '`/poll` `/remind` `/announce` `/nick`', inline: false },
+        { name: '⚙️ Utilidad', value: '`/poll` `/remind` `/announce` `/nick` `/config`', inline: false },
         // Categoría: Niveles
         { name: '📈 Niveles', value: '`/rank` `/leaderboard` `/profile` `/achievements` `/title` `/racha`', inline: false },
         // Categoría: Moderación (solo admins)
@@ -41,6 +42,15 @@ module.exports = {
       .setColor('#5865F2')
       .setFooter({ text: 'Hazuru\'s Assistant' })
       .setTimestamp();
+
+    // Los comandos de dueño solo se muestran a quien realmente puede usarlos.
+    if (isOwner(interaction.user.id)) {
+      embed.addFields({
+        name: '🔐 Dueño del bot',
+        value: '`/owner panel` `/owner whoami` `/owner settings` `/owner dashboard`',
+        inline: false,
+      });
+    }
 
     await interaction.reply({ embeds: [embed] });
   },

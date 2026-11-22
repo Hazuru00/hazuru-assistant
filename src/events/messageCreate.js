@@ -6,8 +6,8 @@ const {
   streamSession, deleteSession, abortSession,
   respondPermission
 } = require('../utils/opencode');
+const { isOwner } = require('../utils/owner');
 
-const OWNER_ID = process.env.OPENCODE_OWNER_ID || '754787869532618883';
 const MAX_DISCORD_MSG = 2000;
 const sessions = new Map();
 const activeControllers = new Map();
@@ -118,7 +118,7 @@ module.exports = {
       return;
     }
 
-    if (message.author.id !== OWNER_ID) {
+    if (!isOwner(message.author.id)) {
       try { await message.reply('No tienes permiso.'); } catch {}
       return;
     }
