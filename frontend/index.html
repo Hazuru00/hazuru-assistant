@@ -95,7 +95,13 @@
       </div>
       <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
         <button v-for="item in navItems" :key="item.id" @click="currentPage = item.id; cerrarSidebar()"
-          :class="currentPage === item.id ? 'bg-discord/20 text-discord border-discord/30' : 'text-gray-400 hover:text-white hover:bg-dark-700 border-transparent'"
+          :disabled="!selectedGuild && necesitaGuild(item.id)"
+          :aria-disabled="!selectedGuild && necesitaGuild(item.id)"
+          :title="!selectedGuild && necesitaGuild(item.id) ? 'Selecciona un servidor para usar esta sección' : item.label"
+          :class="[
+            currentPage === item.id ? 'bg-discord/20 text-discord border-discord/30' : 'text-gray-400 hover:text-white hover:bg-dark-700 border-transparent',
+            !selectedGuild && necesitaGuild(item.id) ? 'opacity-40 cursor-not-allowed hover:bg-transparent hover:text-gray-400' : ''
+          ]"
           class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 border text-left">
           <span v-html="item.icon" class="shrink-0"></span>{{ item.label }}
         </button>
@@ -123,9 +129,14 @@
               <p class="text-xs sm:text-sm text-gray-500 truncate">{{ currentPageDesc }}</p>
             </div>
           </div>
-          <div v-if="selectedGuild" class="flex items-center gap-2 bg-dark-700 px-3 py-2 rounded-xl shrink-0">
+          <div v-if="selectedGuild" class="flex items-center gap-2 bg-dark-700 pl-3 pr-1.5 py-1.5 rounded-xl shrink-0">
             <img :src="selectedGuild.icon || 'https://cdn.discordapp.com/embed/avatars/0.png'" class="w-7 h-7 rounded-full" :alt="selectedGuild.name">
             <span class="font-medium text-sm hidden sm:block max-w-[140px] truncate">{{ selectedGuild.name }}</span>
+            <button @click="deseleccionarGuild"
+              class="text-gray-500 hover:text-accent-red p-1.5 rounded-lg hover:bg-dark-600 transition-colors"
+              aria-label="Deseleccionar servidor" title="Deseleccionar servidor">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
           </div>
         </div>
       </header>

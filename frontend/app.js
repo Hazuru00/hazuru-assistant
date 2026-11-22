@@ -877,8 +877,22 @@ createApp({
       'autorole', 'levels', 'automod', 'logging',
     ];
 
+    // Indica si una opción del menú depende de tener un servidor elegido.
+    const necesitaGuild = (pagina) => PAGINAS_CON_GUILD.includes(pagina);
+
     // Ir a la pantalla de inicio para elegir un servidor desde el estado vacío.
     const irASeleccionarGuild = () => {
+      currentPage.value = 'home';
+    };
+
+    // Quita el servidor actual y vuelve al selector. También limpia los datos
+    // que pertenecían a ese servidor para no reutilizarlos por accidente.
+    const deseleccionarGuild = () => {
+      selectedGuild.value = null;
+      channels.value = [];
+      roles.value = [];
+      members.value = [];
+      previewMember.value = '';
       currentPage.value = 'home';
     };
 
@@ -1131,7 +1145,7 @@ createApp({
       commandCategories, filteredCommands, loadCommands,
       commandGroups, iconoComando, colorCategoria,
       sidebarOpen, toggleSidebar, cerrarSidebar,
-      PAGINAS_CON_GUILD, irASeleccionarGuild,
+      PAGINAS_CON_GUILD, necesitaGuild, irASeleccionarGuild, deseleccionarGuild,
       navItems, currentPageTitle, currentPageDesc, loadingGuilds, saving, toasts,
       welcomeConfig, farewellConfig, privateConfig, boostConfig, banConfig, kickConfig, autoRoleConfig, autoRoleTab,
       levelsConfig, levelsTab, levelsLeaderboard,
