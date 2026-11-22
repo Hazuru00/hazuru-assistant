@@ -140,6 +140,8 @@ Usa estas variables en mensajes de bienvenida, despedida, DM, boost, ban, kick:
 > estas mismas variables, excepto que `{user}` muestra el **nombre** en lugar de una
 > mención (las menciones no se renderizan dentro de una imagen). El texto se ajusta
 > automáticamente al ancho y las líneas no se solapan al cambiar los tamaños de fuente.
+> Los fondos GIF se componen frame a frame respetando transparencia y disposal, así que
+> no aparecen manchas negras en los primeros fotogramas.
 
 ---
 

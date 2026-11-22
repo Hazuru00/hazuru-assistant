@@ -31,8 +31,7 @@
  */
 
 const { createCanvas, loadImage, GlobalFonts } = require('@napi-rs/canvas');
-const { GifWriter } = require('omggif');
-const { GifFrame, GifUtil, GifKind } = require('gifwrap');
+const { GifReader, GifWriter } = require('omggif');
 const path = require('path');
 const fs = require('fs');
 const { getElementState, NEUTRAL } = require('./textAnimations');
@@ -347,16 +346,24 @@ async function renderFrame(ctx, width, height, cardConfig, theme, member, frame,
   // --- FONDO ---
   // Si hay frames de GIF predecodificados, usarlos; si no, cargar imagen normal
     if (bgFrames && bgFrames.length > 0) {
+    // Fondo base: los huecos transparentes del GIF deben mostrar el gradiente,
+    // no negro. Así tamp aparecen manchas negras al usar GIFs con transparencia.
+    const grad = ctx.createLinearGradient(0, 0, width, height);
+    grad.addColorStop(0, theme.gradient[0]);
+    grad.addColorStop(1, theme.gradient[1]);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, width, height);
+
     try {
       const gifFrameIndex = Math.floor((frame / frames) * bgFrames.length);
       const gifFrame = bgFrames[gifFrameIndex % bgFrames.length];
-      
-      const tempCanvas = createCanvas(gifFrame.bitmap.width, gifFrame.bitmap.height);
+
+      const tempCanvas = createCanvas(gifFrame.width, gifFrame.height);
       const tempCtx = tempCanvas.getContext('2d');
-      const imgData = tempCtx.createImageData(gifFrame.bitmap.width, gifFrame.bitmap.height);
-      imgData.data.set(gifFrame.bitmap.data);
+      const imgData = tempCtx.createImageData(gifFrame.width, gifFrame.height);
+      imgData.data.set(gifFrame.data);
       tempCtx.putImageData(imgData, 0, 0);
-      
+
       const bg = tempCanvas;
       const zoom = (cardConfig.bgZoom || 100) / 100;
       const scale = cardConfig.bgScale || 'cover';
@@ -580,6 +587,72 @@ async function renderFrame(ctx, width, height, cardConfig, theme, member, frame,
   }
 }
 
+/**
+ * Limpia un rectángulo de un buffer RGBA (lo deja transparente).
+ * Se usa al aplicar el disposal=2 de los GIF (restaurar al fondo).
+ */
+function clearGifRegion(pixels, width, height, rect) {
+  const x0 = Math.max(0, Math.min(width, rect.x));
+  const y0 = Math.max(0, Math.min(height, rect.y));
+  const x1 = Math.max(0, Math.min(width, rect.x + rect.width));
+  const y1 = Math.max(0, Math.min(height, rect.y + rect.height));
+  for (let y = y0; y < y1; y++) {
+    pixels.fill(0, (y * width + x0) * 4, (y * width + x1) * 4);
+  }
+}
+
+/**
+ * Decodifica un GIF a frames RGBA del tamaño lógico completo, aplicando
+ * correctamente la disposal method de cada frame.
+ *
+ * gifwrap recorta los frames parciales y no compone unos sobre otros, así que
+ * los huecos quedaban negros y se veían manchas en los primeros frames. Aquí
+ * se mantiene un "canvas" acumulado: antes de dibujar cada frame se aplica lo
+ * que indicaba el frame anterior (nada, limpiar, o restaurar el anterior) y
+ * luego se hace blit del frame actual sobre ese canvas.
+ */
+function decodeAnimatedGif(buffer) {
+  const reader = new GifReader(buffer);
+  const width = reader.width;
+  const height = reader.height;
+  const totalPixels = width * height * 4;
+  const current = new Uint8ClampedArray(totalPixels);
+  const frames = [];
+
+  let pendingDisposal = 0;
+  let pendingRect = null;
+  let snapshot = null;
+
+  for (let i = 0; i < reader.numFrames(); i++) {
+    const info = reader.frameInfo(i);
+
+    // Aplicar lo que el frame anterior dijo que hiciera después de mostrarse
+    if (pendingDisposal === 2 && pendingRect) {
+      clearGifRegion(current, width, height, pendingRect);
+    } else if (pendingDisposal === 3 && snapshot) {
+      current.set(snapshot);
+    }
+
+    // disposal=3 necesita una copia del estado antes de dibujar este frame
+    snapshot = info.disposal === 3 ? new Uint8ClampedArray(current) : null;
+
+    // omggif escribe RGBA y respeta los píxeles transparentes (no los pisa)
+    reader.decodeAndBlitFrameRGBA(i, current);
+
+    frames.push({
+      width,
+      height,
+      data: new Uint8ClampedArray(current),
+      delay: info.delay,
+    });
+
+    pendingDisposal = info.disposal;
+    pendingRect = info;
+  }
+
+  return frames;
+}
+
 
 // ============================================================================
 // GENERACIÓN DE IMÁGENES
@@ -731,8 +804,7 @@ async function generateAnimatedCard(member, config, isWelcome = true) {
     try {
       const response = await fetch(cardConfig.background);
       const buffer = Buffer.from(await response.arrayBuffer());
-      const gif = await GifUtil.read(buffer);
-      bgFrames = gif.frames;
+      bgFrames = decodeAnimatedGif(buffer);
     } catch {
       // Si falla, renderFrame usará loadImage como fallback
       bgFrames = null;

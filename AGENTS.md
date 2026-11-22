@@ -154,6 +154,10 @@ no se renderiza dentro de una imagen.
 - El texto que excede el ancho disponible se reduce automáticamente y, si aún no cabe, se trunca con `…`.
 - Las fuentes de `uploads/fonts/` se registran usando el nombre visible de `fonts.json`
   (ej: `BoldPixels`), no el nombre del archivo.
+- Los GIF de fondo se decodifican con `omggif` directamente en `decodeAnimatedGif`:
+  se mantiene un canvas acumulado y se aplica la `disposal method` de cada frame.
+  No usar `gifwrap` para esto: recortaba los frames parciales y perdía la transparencia,
+  lo que generaba manchas negras en los primeros fotogramas.
 
 ## Animación de textos en tarjetas
 - `src/utils/textAnimations.js` es el **único motor**. Los presets y las animaciones
