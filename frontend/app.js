@@ -228,6 +228,12 @@ createApp({
     const cardAnimations = ref([]);
     const animEditorOpen = ref(false);
     const animFrame = ref(0);
+    // En GIFs se reproduce el archivo completo por defecto; al desactivarlo
+    // se muestra el timeline y la preview pasa a ser un frame puntual (PNG).
+    const autoPlayPreview = ref(true);
+    // Auto-actualización de la preview al cambiar keyframes/ajustes. Si se
+    // desactiva, solo se regenera al apretar "Regenerar ahora".
+    const autoRefreshPreview = ref(true);
     const animSaving = ref(false);
     const newAnimName = ref('');
     const customDefinition = () => ({
@@ -254,6 +260,26 @@ createApp({
         if (map[currentPage.value]) map[currentPage.value].value = val;
       }
     });
+
+    const isGifPreview = computed(() => !!currentConfig.value.card?.animated);
+
+    const phaseInfo = {
+      intro: { label: 'Entrada', hint: 'al aparecer', color: '#23a55a' },
+      loop: { label: 'Bucle', hint: 'mientras está', color: '#5865f2' },
+      outro: { label: 'Salida', hint: 'al desaparecer', color: '#f23f43' },
+    };
+
+    /** Barras proporcionales de las 3 fases para un elemento (solo lectura). */
+    const timelineBar = (element) => {
+      const card = currentConfig.value.card || {};
+      const total = (card.animationFrames || 30) * (card.animationDelay || 100) / 1000;
+      const phases = card.textAnimations?.[element] || {};
+      const intro = Math.min(Math.max(Number(phases.intro?.duration) || 0, 0), total);
+      const outro = Math.min(Math.max(Number(phases.outro?.duration) || 0, 0), total - intro);
+      const loop = Math.max(total - intro - outro, 0);
+      const pct = (v) => total > 0 ? (v / total) * 100 : 0;
+      return { intro: pct(intro), loop: pct(loop), outro: pct(outro) };
+    };
 
     const currentPageTitle = computed(() => {
       const t = { home: 'Inicio', welcome: 'Bienvenidas', farewell: 'Despedidas', private: 'DM Bienvenida', boost: 'Boost', ban: 'Bans', kick: 'Kicks', autorole: 'Auto-Role', automod: 'Auto-Moderación', logging: 'Logging', commands: 'Comandos', settings: 'Ajustes', levels: 'Niveles' };
@@ -536,7 +562,6 @@ createApp({
       event.target.value = '';
     };
 
-    const previewCardDebounce = { welcome: null, farewell: null };
     const cardPreviewLoading = ref(false);
 
     // frame y draft son opcionales: permiten ver un instante concreto y
@@ -567,11 +592,6 @@ createApp({
       } finally {
         cardPreviewLoading.value = false;
       }
-    };
-
-    const previewCardDebounced = (type) => {
-      if (previewCardDebounce[type]) clearTimeout(previewCardDebounce[type]);
-      previewCardDebounce[type] = setTimeout(() => previewCard(type), 400);
     };
 
     // --- Librería y editor de animaciones ---
@@ -619,14 +639,46 @@ createApp({
       if (!selectedGuild.value || !currentConfig.value.card?.enabled) return;
       const page = currentPage.value;
       if (page !== 'welcome' && page !== 'farewell') return;
-      previewCard(page, animFrame.value, currentAnimDraft());
+
+      // Con autoplay en un GIF se muestra el archivo animado completo.
+      // Sin autoplay (o en PNG) se dibuja el frame exacto del scrubber, que
+      // es el único modo en el que se puede aplicar el borrador del editor.
+      if (isGifPreview.value && autoPlayPreview.value) {
+        previewCard(page);
+      } else {
+        previewCard(page, animFrame.value, currentAnimDraft());
+      }
     };
     const previewAnimDebounced = () => {
+      if (!autoRefreshPreview.value) return;
       if (animDraftTimer) clearTimeout(animDraftTimer);
       animDraftTimer = setTimeout(previewAnimDraft, 120);
     };
 
+    const regeneratePreview = () => {
+      if (animDraftTimer) clearTimeout(animDraftTimer);
+      if (manualPreviewTimer) clearTimeout(manualPreviewTimer);
+      previewAnimDraft();
+    };
+
+    // Pequeño debounce exclusivo para el scrubber (no depende de Auto-actualizar)
+    let manualPreviewTimer = null;
+    const regeneratePreviewDebounced = () => {
+      if (manualPreviewTimer) clearTimeout(manualPreviewTimer);
+      manualPreviewTimer = setTimeout(regeneratePreview, 80);
+    };
+
+    const setAutoPlayPreview = (value) => {
+      autoPlayPreview.value = value;
+      regeneratePreview();
+    };
+
     const animMaxFrame = computed(() => Math.max(0, (currentConfig.value.card?.animationFrames || 30) - 1));
+
+    const jumpToFrame = (value) => {
+      animFrame.value = Math.min(animMaxFrame.value, Math.max(0, value));
+      regeneratePreview();
+    };
 
     const openAnimEditor = (element, phase) => {
       const ph = getAnimPhase(element, phase);
@@ -639,7 +691,9 @@ createApp({
       const saved = cardAnimations.value.find(a => a.id === ph.id);
       newAnimName.value = saved ? saved.name : '';
       animEditorOpen.value = true;
-      previewAnimDebounced();
+      // Editar keyframes necesita ver un frame concreto, no el GIF en bucle
+      autoPlayPreview.value = false;
+      regeneratePreview();
     };
 
     const onAnimPhaseChange = (element, phase) => {
@@ -705,7 +759,7 @@ createApp({
       animEditor.value.selectedId = anim.id;
       animEditor.value.definition = JSON.parse(JSON.stringify(anim.definition));
       newAnimName.value = anim.name;
-      previewAnimDebounced();
+      regeneratePreview();
     };
 
     const deleteCardAnim = async (id) => {
@@ -736,11 +790,12 @@ createApp({
       const page = currentPage.value;
       if (page !== 'welcome' && page !== 'farewell') return;
       const card = page === 'welcome' ? welcomeConfig.value.card : farewellConfig.value.card;
-      if (card && card.enabled) {
-        if (animEditorOpen.value) previewAnimDebounced();
-        else previewCardDebounced(page);
-      }
+      if (card && card.enabled) previewAnimDebounced();
     }, { deep: true });
+
+    watch(autoRefreshPreview, (value) => {
+      if (value) regeneratePreview();
+    });
 
     const selectGuild = async (guild) => {
       selectedGuild.value = guild;
@@ -941,7 +996,9 @@ createApp({
     };
 
     // El scrubber y el borrador también deben refrescar la preview
-    watch(animFrame, previewAnimDebounced);
+    // El scrubber es una acción manual: siempre actualiza, aunque el
+    // auto-actualizado esté desactivado para los cambios de configuración.
+    watch(animFrame, regeneratePreviewDebounced);
     watch(animEditor, previewAnimDebounced, { deep: true });
 
     onMounted(() => {
@@ -973,10 +1030,12 @@ createApp({
       resetEmbed, addField, copyVar, replacePreview,
       uploadImage, sendPreview, showToast, toggleServerAuth, toggleAuthFilter,
       welcomeCardPreview, farewellCardPreview, cardPreviewLoading,
-      animElements, animPhases, animationPresets, cardAnimations,
-      animEditorOpen, animFrame, animMaxFrame, animSaving, newAnimName, animEditor,
+      animElements, animPhases, phaseInfo, animationPresets, cardAnimations,
+      animEditorOpen, animFrame, animMaxFrame, autoPlayPreview, autoRefreshPreview,
+      animSaving, newAnimName, animEditor, isGifPreview, timelineBar,
       getAnimPhase, openAnimEditor, onAnimPhaseChange, addKeyframe, removeKeyframe,
-      saveCardAnimation, deleteCardAnim, previewAnimDraft, applySavedAnimation,
+      saveCardAnimation, deleteCardAnim, previewAnimDraft, previewAnimDebounced, regeneratePreview,
+      setAutoPlayPreview, jumpToFrame, applySavedAnimation,
     };
   }
 }).mount('#app');

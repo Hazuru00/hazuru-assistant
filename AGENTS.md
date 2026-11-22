@@ -177,6 +177,10 @@ no se renderiza dentro de una imagen.
 - `generateCard(member, config, isWelcome, { frame, draftAnimation })` permite
   renderizar un frame puntual del timeline. El dashboard usa `draftAnimation` con el
   ID interno `__draft__` para ver la animación en edición antes de guardarla.
+- En la preview: si la card es GIF, `autoPlayPreview` reproduce el archivo completo;
+  al desactivarlo aparece el timeline y se pide un frame como PNG. `autoRefreshPreview`
+  controla si los cambios regeneran la preview solos; `Regenerar ahora` fuerza una
+  regeneración manual. Abrir el editor de keyframes fuerza el modo timeline.
 - API: `GET/POST /api/card-animations`, `PUT/DELETE /api/card-animations/:id`.
   `POST /api/guilds/:id/preview-card/:type` acepta `frame` y `draftAnimation`.
 - `src/database/cardAnimations.js` persiste en `cardAnimations.json` con `atomic.js`.

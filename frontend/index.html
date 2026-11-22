@@ -563,12 +563,32 @@
               </div>
 
               <div class="bg-dark-700 rounded-xl p-4">
-                <div class="flex items-center justify-between mb-3">
-                  <p class="text-xs text-gray-500">Vista Previa (automatica)</p>
-                  <span v-if="cardPreviewLoading" class="text-xs text-discord flex items-center gap-1">
-                    <svg class="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                    Generando...
-                  </span>
+                <div class="flex items-start justify-between gap-3 mb-3 flex-wrap">
+                  <p class="text-xs text-gray-500">
+                    Vista Previa
+                    <span class="text-gray-600">({{ currentConfig.card.animated ? (autoPlayPreview ? 'GIF automático' : 'frame manual') : 'automática' }})</span>
+                  </p>
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span v-if="cardPreviewLoading" class="text-xs text-discord flex items-center gap-1">
+                      <svg class="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                      Generando...
+                    </span>
+                    <button
+                      v-if="currentConfig.card.animated"
+                      @click="setAutoPlayPreview(!autoPlayPreview)"
+                      class="text-[11px] px-2.5 py-1.5 rounded-lg border transition-colors"
+                      :class="autoPlayPreview ? 'border-discord/60 bg-discord/10 text-discord hover:bg-discord/20' : 'border-gray-700 text-gray-400 hover:text-white hover:border-discord'"
+                    >
+                      {{ autoPlayPreview ? '⏸ Ver timeline' : '▶ Ver animación automática' }}
+                    </button>
+                    <button @click="regeneratePreview" class="text-[11px] px-2.5 py-1.5 rounded-lg border border-gray-700 text-gray-400 hover:text-white hover:border-discord transition-colors" title="Generar la preview ahora mismo">
+                      ↻ Regenerar ahora
+                    </button>
+                    <label class="flex items-center gap-1 text-[11px] text-gray-400 cursor-pointer" title="Actualizar la preview automáticamente al cambiar algo">
+                      <input type="checkbox" v-model="autoRefreshPreview" class="accent-discord">
+                      Auto-actualizar
+                    </label>
+                  </div>
                 </div>
                 <div v-if="(currentPage === 'welcome' ? welcomeCardPreview : farewellCardPreview)" class="rounded-lg overflow-hidden border border-gray-700">
                   <img :src="currentPage === 'welcome' ? welcomeCardPreview : farewellCardPreview" class="w-full">
@@ -577,37 +597,72 @@
                   <p class="text-gray-500 text-sm">Activa la card para ver preview</p>
                 </div>
 
-                <!-- Scrubber global: recorre todo el timeline de la tarjeta -->
-                <div v-if="currentConfig.card.enabled" class="mt-4 pt-4 border-t border-gray-700">
+                <!-- Timeline manual: aparece al desactivar el autoplay del GIF -->
+                <div v-if="currentConfig.card.enabled && (!currentConfig.card.animated || !autoPlayPreview)" class="mt-4 pt-4 border-t border-gray-700">
                   <label class="block text-xs text-gray-400 mb-2">
                     Timeline: {{ (animFrame * (currentConfig.card.animationDelay || 100) / 1000).toFixed(2) }}s
                     <span class="text-gray-600">/ {{ ((currentConfig.card.animationFrames || 30) * (currentConfig.card.animationDelay || 100) / 1000).toFixed(2) }}s</span>
                   </label>
                   <input type="range" v-model.number="animFrame" :min="0" :max="animMaxFrame" step="1" class="w-full accent-discord">
-                  <p class="text-[11px] text-gray-600 mt-1">Arrastra para ver cualquier instante (también funciona con el borrador del editor).</p>
+                  <div class="flex items-center justify-between text-[10px] text-gray-600 mt-1">
+                    <button @click="jumpToFrame(0)" class="hover:text-discord">Inicio</button>
+                    <span>Arrastra para ver cualquier instante</span>
+                    <button @click="jumpToFrame(animMaxFrame)" class="hover:text-discord">Fin</button>
+                  </div>
                 </div>
               </div>
             </div>
 
             <!-- ANIMACIÓN DE TEXTOS -->
             <div v-if="currentConfig.card.enabled" class="mt-8 border-t border-gray-800 pt-6">
-              <div class="flex items-center justify-between mb-4">
+              <div class="flex items-start justify-between gap-4 mb-4 flex-wrap">
                 <div>
                   <h4 class="font-semibold text-base">Animación de textos</h4>
-                  <p class="text-xs text-gray-500">Entrada → bucle → salida. Todo se ve en la preview de arriba.</p>
+                  <p class="text-xs text-gray-500">Elige qué hace cada texto al entrar, mientras está y al salir.</p>
                 </div>
                 <button @click="animEditorOpen = !animEditorOpen" class="text-xs px-3 py-1.5 rounded-lg border border-gray-700 hover:border-discord text-gray-400 hover:text-white transition-colors">
-                  {{ animEditorOpen ? 'Cerrar editor' : 'Editor de keyframes' }}
+                  {{ animEditorOpen ? 'Ocultar editor avanzado' : 'Abrir editor avanzado' }}
                 </button>
               </div>
 
+              <details class="mb-4 bg-dark-700/40 rounded-xl px-4 py-3 text-xs text-gray-400">
+                <summary class="cursor-pointer text-gray-300 font-medium">Guía rápida (30 segundos)</summary>
+                <ol class="list-decimal list-inside mt-2 space-y-1">
+                  <li>Elige el elemento: Título, Usuario o Subtítulo.</li>
+                  <li>Selecciona Entrada, Bucle o Salida y una animación.</li>
+                  <li>Ajusta la duración en segundos. El bucle ocupa el tiempo restante.</li>
+                  <li>Arrastra el timeline de la preview para verlo. Si quieres algo único, aprieta <b class="text-gray-300">Editar keyframes</b> y guarda tu animación.</li>
+                </ol>
+              </details>
+
               <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <div v-for="el in animElements" :key="el.id" class="bg-dark-700/60 rounded-xl p-4 border border-gray-800">
-                  <p class="text-sm font-medium mb-3">{{ el.label }}</p>
+                  <div class="flex items-center justify-between mb-3">
+                    <p class="text-sm font-medium">{{ el.label }}</p>
+                    <span class="text-[10px] text-gray-600 uppercase tracking-wide">{{ el.id }}</span>
+                  </div>
+
+                  <!-- Barra visual de las 3 fases -->
+                  <div
+                    class="flex h-1.5 rounded-full overflow-hidden bg-dark-800 mb-1"
+                    :title="`Entrada ${timelineBar(el.id).intro.toFixed(0)}% · Bucle ${timelineBar(el.id).loop.toFixed(0)}% · Salida ${timelineBar(el.id).outro.toFixed(0)}%`"
+                  >
+                    <div :style="{ width: timelineBar(el.id).intro + '%', background: phaseInfo.intro.color }"></div>
+                    <div :style="{ width: timelineBar(el.id).loop + '%', background: phaseInfo.loop.color }"></div>
+                    <div :style="{ width: timelineBar(el.id).outro + '%', background: phaseInfo.outro.color }"></div>
+                  </div>
+                  <div class="flex justify-between text-[10px] text-gray-600 mb-3">
+                    <span>Entrada</span><span>Bucle</span><span>Salida</span>
+                  </div>
+
                   <div v-for="ph in animPhases" :key="ph.id" class="mb-3 last:mb-0">
-                    <div class="flex items-center justify-between mb-1">
-                      <label class="text-xs text-gray-400">{{ ph.label }}</label>
-                      <button @click="openAnimEditor(el.id, ph.id)" class="text-[11px] text-discord hover:text-white transition-colors">Editar</button>
+                    <div class="flex items-center justify-between mb-1 gap-2">
+                      <label class="text-xs text-gray-300 flex items-center gap-1.5 min-w-0">
+                        <span class="w-1.5 h-1.5 rounded-full shrink-0" :style="{ background: phaseInfo[ph.id].color }"></span>
+                        <span>{{ phaseInfo[ph.id].label }}</span>
+                        <span class="text-gray-600 truncate">· {{ phaseInfo[ph.id].hint }}</span>
+                      </label>
+                      <button @click="openAnimEditor(el.id, ph.id)" class="text-[11px] text-discord hover:text-white transition-colors shrink-0">Editar keyframes</button>
                     </div>
                     <div class="flex gap-2">
                       <select
@@ -623,17 +678,20 @@
                           <option v-for="a in cardAnimations" :key="a.id" :value="a.id">{{ a.name }}</option>
                         </optgroup>
                       </select>
-                      <input
-                        type="number" min="0" max="3" step="0.1"
-                        v-model.number="currentConfig.card.textAnimations[el.id][ph.id].duration"
-                        @change="previewAnimDraft()"
-                        class="w-16 bg-dark-800 border border-gray-700 rounded-lg px-2 py-2 text-xs focus:border-discord focus:outline-none"
-                        title="Duración en segundos"
-                      >
+                      <div class="relative w-20 shrink-0">
+                        <input
+                          type="number" min="0" max="3" step="0.1"
+                          v-model.number="currentConfig.card.textAnimations[el.id][ph.id].duration"
+                          @change="previewAnimDebounced()"
+                          class="w-full h-full bg-dark-800 border border-gray-700 rounded-lg pl-2 pr-6 py-2 text-xs text-right focus:border-discord focus:outline-none"
+                          title="Duración en segundos"
+                        >
+                        <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-500 pointer-events-none">s</span>
+                      </div>
                     </div>
                     <label class="flex items-center gap-1.5 mt-1.5 text-[11px] text-gray-500 cursor-pointer">
-                      <input type="checkbox" v-model="currentConfig.card.textAnimations[el.id][ph.id].reverse" @change="previewAnimDraft()" class="accent-discord">
-                      Invertir (salida)
+                      <input type="checkbox" v-model="currentConfig.card.textAnimations[el.id][ph.id].reverse" @change="previewAnimDebounced()" class="accent-discord">
+                      Invertir (útil para salida)
                     </label>
                   </div>
                 </div>
@@ -641,6 +699,23 @@
 
               <!-- EDITOR DE KEYFRAMES -->
               <div v-if="animEditorOpen" class="mt-5 bg-dark-800 rounded-xl p-5 border border-gray-700 space-y-4">
+                <div class="flex items-start justify-between gap-3 flex-wrap">
+                  <div>
+                    <p class="text-sm font-medium">Editor de keyframes</p>
+                    <p class="text-xs text-gray-500">
+                      Editando
+                      <b class="text-discord">{{ animElements.find(e => e.id === animEditor.element)?.label }}</b>
+                      ·
+                      <b :style="{ color: phaseInfo[animEditor.phase].color }">{{ phaseInfo[animEditor.phase].label }}</b>
+                    </p>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button @click="jumpToFrame(0)" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-dark-700 hover:bg-dark-600 text-gray-400 hover:text-white">Inicio</button>
+                    <button @click="jumpToFrame(animMaxFrame)" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-dark-700 hover:bg-dark-600 text-gray-400 hover:text-white">Fin</button>
+                    <button @click="animEditorOpen = false" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-dark-700 hover:bg-dark-600 text-gray-400 hover:text-white">✕ Cerrar</button>
+                  </div>
+                </div>
+
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
                     <label class="block text-xs text-gray-400 mb-1">Elemento</label>
@@ -664,7 +739,7 @@
 
                 <div>
                   <div class="flex items-center justify-between mb-2">
-                    <label class="text-xs text-gray-400">Keyframes (0 = inicio, 1 = fin)</label>
+                    <label class="text-xs text-gray-400">Keyframes: <span class="text-gray-600">At 0 = inicio de la fase, At 1 = fin</span></label>
                     <button @click="addKeyframe" class="text-xs text-discord hover:text-white">+ Añadir</button>
                   </div>
                   <div class="overflow-x-auto">
@@ -689,17 +764,18 @@
                       </tbody>
                     </table>
                   </div>
+                  <p class="text-[11px] text-gray-600 mt-2">Deja un campo en su valor neutro (1 u 0) si no quieres animar esa propiedad. Los cambios se ven en el frame del timeline.</p>
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2 border-t border-gray-700 pt-4">
                   <input v-model="newAnimName" placeholder="Nombre para guardar…" class="flex-1 min-w-[180px] bg-dark-700 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-discord focus:outline-none">
                   <button @click="saveCardAnimation(false)" :disabled="animSaving" class="bg-discord hover:bg-discord-hover px-4 py-2 rounded-lg text-sm disabled:opacity-50">Guardar como…</button>
                   <button v-if="animEditor.selectedId.startsWith('anim_')" @click="saveCardAnimation(true)" :disabled="animSaving" class="bg-dark-600 hover:bg-dark-500 px-4 py-2 rounded-lg text-sm disabled:opacity-50">Actualizar</button>
-                  <button @click="previewAnimDraft()" class="bg-dark-600 hover:bg-dark-500 px-4 py-2 rounded-lg text-sm">Ver en frame</button>
+                  <button @click="regeneratePreview" class="bg-dark-600 hover:bg-dark-500 px-4 py-2 rounded-lg text-sm">↻ Regenerar ahora</button>
                 </div>
 
                 <div v-if="cardAnimations.length" class="border-t border-gray-700 pt-4">
-                  <p class="text-xs text-gray-400 mb-2">Mis animaciones (disponibles en todos los servidores)</p>
+                  <p class="text-xs text-gray-400 mb-2">Mis animaciones <span class="text-gray-600">(disponibles en todos los servidores de este bot)</span></p>
                   <div class="space-y-1.5">
                     <div v-for="a in cardAnimations" :key="a.id" class="flex items-center justify-between bg-dark-700 rounded-lg px-3 py-2">
                       <button @click="applySavedAnimation(a)" class="text-sm text-left hover:text-discord">{{ a.name }}</button>

@@ -163,7 +163,12 @@ Cada elemento de texto (título, usuario y subtítulo) puede tener tres fases in
 
 ### Editor y librería global
 
-En el editor de la card hay un **scrubber** que recorre el timeline y muestra el frame exacto dentro de la tarjeta. El botón **Editor de keyframes** permite editar opacidad, X, Y, escala, rotación, caracteres visibles y recorte horizontal, además del easing.
+En la preview de la card:
+
+- Con **Animar (GIF)** activo, el botón **Ver animación automática / Ver timeline** alterna entre reproducir el GIF completo y inspeccionar un frame puntual.
+- **Regenerar ahora** fuerza la generación de la preview. El checkbox **Auto-actualizar** decide si los cambios regeneran la preview solos o solo cuando lo pides.
+
+El panel de animación muestra una barra de las tres fases por elemento, una guía rápida y un **editor avanzado de keyframes** para opacidad, X, Y, escala, rotación, caracteres visibles y recorte horizontal, además del easing.
 
 Las animaciones creadas con **Guardar como…** se guardan en `src/database/cardAnimations.json` y están disponibles para **todos los servidores configurados en ese despliegue**. Se pueden editar (**Actualizar**) y borrar desde **Mis animaciones**; si se borra una animación en uso, las cards caen a `Ninguna` sin romperse.
 
