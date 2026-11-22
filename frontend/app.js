@@ -20,29 +20,50 @@ createApp({
       { label: 'Uptime', value: '0s' },
     ]);
 
-    const commands = ref([
-      { name: 'ping', description: 'Muestra la latencia del bot' },
-      { name: 'serverinfo', description: 'Informacion del servidor' },
-      { name: 'help', description: 'Muestra todos los comandos' },
-      { name: 'userinfo', description: 'Informacion de un usuario' },
-      { name: 'avatar', description: 'Avatar de un usuario' },
-      { name: 'server', description: 'Info detallada del servidor' },
-      { name: 'botinfo', description: 'Informacion del bot' },
-      { name: '8ball', description: 'La bola magica responde' },
-      { name: 'poll', description: 'Crear una encuesta' },
-      { name: 'remind', description: 'Establecer un recordatorio' },
-      { name: 'announce', description: 'Enviar un anuncio a un canal' },
-      { name: 'nick', description: 'Cambiar nickname de un usuario' },
-      { name: 'ban', description: 'Banear a un usuario (Admin)' },
-      { name: 'kick', description: 'Expulsar a un usuario (Admin)' },
-      { name: 'warn', description: 'Advertir a un usuario (Admin)' },
-      { name: 'warnings', description: 'Ver advertencias (Admin)' },
-      { name: 'unwarn', description: 'Remover advertencia (Admin)' },
-      { name: 'timeout', description: 'Silenciar usuario temporalmente (Admin)' },
-      { name: 'untimeout', description: 'Remover silencio (Admin)' },
-      { name: 'purge', description: 'Eliminar mensajes (Admin)' },
-      { name: 'slowmode', description: 'Slowmode del canal (Admin)' },
-    ]);
+    // La lista de comandos NO va hardcodeada: se consulta a /api/commands, que
+    // devuelve los comandos reales cargados por el bot (igual que /help).
+    const commands = ref([]);
+    const commandsLoading = ref(false);
+    const commandsError = ref('');
+    const commandSearch = ref('');
+    const commandCategory = ref('Todas');
+
+    // Categorías derivadas de los propios comandos (sin listas fijas).
+    const commandCategories = computed(() => {
+      const vistas = new Set(commands.value.map(c => c.categoria || '🔧 Otros'));
+      return ['Todas', ...[...vistas].sort()];
+    });
+
+    // Búsqueda por nombre, descripción o sintaxis de cualquier variante.
+    const filteredCommands = computed(() => {
+      const texto = commandSearch.value.trim().toLowerCase();
+      return commands.value.filter(c => {
+        const enCategoria = commandCategory.value === 'Todas' || c.categoria === commandCategory.value;
+        if (!enCategoria) return false;
+        if (!texto) return true;
+        const buscable = [
+          c.name,
+          c.description,
+          ...(c.variantes || []).flatMap(v => [v.sintaxis, v.descripcion]),
+        ].join(' ').toLowerCase();
+        return buscable.includes(texto);
+      });
+    });
+
+    const loadCommands = async () => {
+      commandsLoading.value = true;
+      commandsError.value = '';
+      try {
+        const res = await fetch('/api/commands');
+        if (!res.ok) throw new Error('No se pudo consultar el bot');
+        const data = await res.json();
+        commands.value = data.comandos || [];
+      } catch (e) {
+        commandsError.value = e.message || 'Error de conexión';
+      } finally {
+        commandsLoading.value = false;
+      }
+    };
 
     const navItems = [
       { id: 'home', label: 'Inicio', icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>' },
@@ -1001,7 +1022,14 @@ createApp({
     watch(animFrame, regeneratePreviewDebounced);
     watch(animEditor, previewAnimDebounced, { deep: true });
 
+    // Cada vez que se abre el panel de comandos se vuelven a consultar:
+    // si el bot se reinició o cambiaron los comandos, se refleja al instante.
+    watch(currentPage, (pagina) => {
+      if (pagina === 'commands') loadCommands();
+    });
+
     onMounted(() => {
+      loadCommands();
       loadDashboardConfig();
       loadAuthorizedServers();
       loadFonts();
@@ -1017,6 +1045,8 @@ createApp({
 
     return {
       status, guilds, selectedGuild, channels, currentPage, stats, commands,
+      commandsLoading, commandsError, commandSearch, commandCategory,
+      commandCategories, filteredCommands, loadCommands,
       navItems, currentPageTitle, currentPageDesc, loadingGuilds, saving, toasts,
       welcomeConfig, farewellConfig, privateConfig, boostConfig, banConfig, kickConfig, autoRoleConfig, autoRoleTab,
       levelsConfig, levelsTab, levelsLeaderboard,

@@ -361,6 +361,52 @@ prueba('/modlog exige permiso y avisa cuando no hay datos', async () => {
 });
 
 // ---------------------------------------------------------------------------
+// Panel de comandos: helper compartido con /help y /api/commands
+// ---------------------------------------------------------------------------
+prueba('commandInfo genera la misma sintaxis para help y el dashboard', () => {
+  const { variantesDe, seccionDe, resumenDe } = require(ruta('src/utils/commandInfo.js'));
+
+  // Un comando simple con argumentos obligatorios y opcionales.
+  const simple = { name: 'poll-close', description: 'Cerrar encuesta', options: [
+    { name: 'mensaje', type: 3, required: true },
+    { name: 'canal', type: 7, required: false },
+  ] };
+  assert.deepStrictEqual(variantesDe(simple), [
+    { sintaxis: '/poll-close <mensaje> [canal]', descripcion: 'Cerrar encuesta' },
+  ]);
+
+  // Un comando con subcomando (como /owner panel) se expande en una línea.
+  const conSub = { name: 'owner', description: 'Dueño', options: [
+    { name: 'panel', type: 1, description: 'Abrir panel', options: [] },
+  ] };
+  assert.strictEqual(variantesDe(conSub)[0].sintaxis, '/owner panel');
+
+  // Clasificación y fallback para comandos nuevos no clasificados.
+  assert(seccionDe('ban').includes('Moderación'), 'sección de ban');
+  assert.strictEqual(seccionDe('comando-nuevo'), '🔧 Otros');
+  assert.strictEqual(resumenDe(simple).nombre, 'poll-close');
+});
+
+prueba('el help sigue incluyendo todas las variantes tras el refactor', async () => {
+  const { variantesDe } = require(ruta('src/utils/commandInfo.js'));
+  const help = require(ruta('src/commands/help.js'));
+  const comandos = new Collection();
+  for (const archivo of fs.readdirSync(ruta('src/commands')).filter(f => f.endsWith('.js'))) {
+    const cmd = require(ruta(`src/commands/${archivo}`));
+    comandos.set(cmd.data.name, cmd);
+  }
+  const { datos, estado } = interaccion();
+  datos.client.commands = comandos;
+  await help.execute(datos);
+  const texto = estado.reply.embeds[0].toJSON().fields.map(f => f.value).join('\n');
+  for (const cmd of comandos.values()) {
+    for (const v of variantesDe(cmd.data.toJSON())) {
+      assert(texto.includes(`\`${v.sintaxis}\``), `falta ${v.sintaxis}`);
+    }
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Ejecución
 // ---------------------------------------------------------------------------
 (async () => {

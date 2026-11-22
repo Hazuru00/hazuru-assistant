@@ -426,6 +426,36 @@ app.get('/api/status', (req, res) => {
 });
 
 
+// --- COMANDOS (para el panel del dashboard) ---
+// GET /api/commands → Devuelve los comandos REALES cargados por el bot.
+// Usa el mismo helper que /help, así ambos se actualizan solos al añadir
+// comandos o cambiar sus opciones.
+app.get('/api/commands', (req, res) => {
+  try {
+    const { resumenDe, variantesDe } = require('./utils/commandInfo');
+    const comandos = [...client.commands.values()]
+      .map(comando => {
+        const json = comando.data.toJSON();
+        const resumen = resumenDe(json);
+        return {
+          name: json.name,
+          description: json.description || '',
+          categoria: resumen.seccion,
+          permisos: json.default_member_permissions || null,
+          variantes: variantesDe(json),
+          ownerOnly: json.name === 'owner',
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    res.json({ total: comandos.length, comandos });
+  } catch (e) {
+    logError(e, { event: 'api/commands', action: 'List commands' });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+
 // --- LISTA DE SERVIDORES ---
 // GET /api/guilds → Lista todos los servidores donde está el bot
 app.get('/api/guilds', (req, res) => {
