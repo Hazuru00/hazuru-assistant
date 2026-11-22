@@ -65,6 +65,53 @@ createApp({
       }
     };
 
+    // Icono que identifica cada comando en la grilla. Los que no están en el
+    // mapa caen en "⌘", así un comando nuevo nunca queda sin icono.
+    const ICONOS_COMANDOS = {
+      help: '❓', ping: '🏓', server: '🖥️', serverinfo: '🏛️', userinfo: '👤',
+      avatar: '🖼️', botinfo: '🤖', '8ball': '🎱', poll: '📊', 'poll-close': '🔒',
+      remind: '⏰', 'remind-list': '📋', announce: '📢', 'announce-preview': '👁️',
+      nick: '🏷️', config: '⚙️', say: '💬', preview: '🔍', 'dm-template': '✉️',
+      'reaction-role': '🎭', rank: '🏆', leaderboard: '🥇', profile: '📜',
+      achievements: '🏅', racha: '🔥', title: '👑', setlevel: '🔼', setxp: '✨',
+      resetlevels: '♻️', ban: '🔨', kick: '🦵', warn: '⚠️', warnings: '📋',
+      unwarn: '✅', timeout: '🔇', untimeout: '🔊', purge: '🧹', slowmode: '🐌',
+      modlog: '📖', owner: '🔐',
+    };
+
+    // Color de acento por sección: tiñe el icono, el nombre y la cabecera.
+    const COLORES_CATEGORIA = {
+      '📊 Información': '#5865F2',
+      '🎲 Diversión': '#eb459e',
+      '⚙️ Utilidad': '#57F287',
+      '📈 Niveles': '#FEE75C',
+      '🔨 Moderación': '#ED4245',
+      '🔐 Dueño del bot': '#b47cff',
+      '🔧 Otros': '#949CF7',
+    };
+    const ORDEN_CATEGORIAS = Object.keys(COLORES_CATEGORIA);
+
+    const iconoComando = (nombre) => ICONOS_COMANDOS[nombre] || '⌘';
+    const colorCategoria = (cat) => COLORES_CATEGORIA[cat] || '#5865F2';
+
+    // Agrupa los comandos filtrados por sección, en el mismo orden que /help.
+    const commandGroups = computed(() => {
+      const mapa = new Map();
+      for (const cmd of filteredCommands.value) {
+        const cat = cmd.categoria || '🔧 Otros';
+        if (!mapa.has(cat)) mapa.set(cat, []);
+        mapa.get(cat).push(cmd);
+      }
+      const orden = [...ORDEN_CATEGORIAS, ...[...mapa.keys()].filter(c => !ORDEN_CATEGORIAS.includes(c))];
+      return orden.filter(cat => mapa.has(cat)).map(cat => ({
+        categoria: cat,
+        nombre: cat.replace(/^\S+\s*/, ''),
+        emoji: cat.match(/^\S+/)?.[0] || '⌘',
+        color: colorCategoria(cat),
+        comandos: mapa.get(cat),
+      }));
+    });
+
     const navItems = [
       { id: 'home', label: 'Inicio', icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>' },
       { id: 'welcome', label: 'Bienvenidas', icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>' },
@@ -1047,6 +1094,7 @@ createApp({
       status, guilds, selectedGuild, channels, currentPage, stats, commands,
       commandsLoading, commandsError, commandSearch, commandCategory,
       commandCategories, filteredCommands, loadCommands,
+      commandGroups, iconoComando, colorCategoria,
       navItems, currentPageTitle, currentPageDesc, loadingGuilds, saving, toasts,
       welcomeConfig, farewellConfig, privateConfig, boostConfig, banConfig, kickConfig, autoRoleConfig, autoRoleTab,
       levelsConfig, levelsTab, levelsLeaderboard,
